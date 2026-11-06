@@ -1,0 +1,7 @@
+.env
+/vendor/
+/var/*
+!/var/.gitkeep
+*.log
+.DS_Store
+.claude/
