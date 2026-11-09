@@ -52,7 +52,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
             <label class="lg:col-span-3 flex flex-col gap-1.5">
                 <span class="text-xs uppercase tracking-widest text-gray-500 font-bold">Código</span>
-                <input name="codigo" maxlength="20" inputmode="numeric" placeholder="Começa com… ex.: 001002"
+                <input name="codigo" maxlength="20" inputmode="numeric" placeholder="Começa com… ex.: 0104"
                        class="campo font-mono">
             </label>
             <label class="lg:col-span-5 flex flex-col gap-1.5">

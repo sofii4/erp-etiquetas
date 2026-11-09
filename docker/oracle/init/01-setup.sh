@@ -40,7 +40,15 @@ CREATE USER ${APP_USER} IDENTIFIED BY \"${APP_PASS}\"
 GRANT CREATE SESSION TO ${APP_USER};
 "
 
-for f in "$SQL_DIR"/02-*.sql "$SQL_DIR"/03-*.sql; do
+# Dados: o export real do cliente (gerado por scripts/csv-para-sql.py, fora
+# do git) tem prioridade; sem ele, carrega os mocks fictícios.
+if [ -f "$SQL_DIR/03-dados-cliente.sql" ]; then
+    DADOS="$SQL_DIR/03-dados-cliente.sql"
+else
+    DADOS="$SQL_DIR/03-mocks.sql"
+fi
+
+for f in "$SQL_DIR"/02-*.sql "$DADOS"; do
     echo "ERP: rodando $(basename "$f")..."
     roda_sql "ALTER SESSION SET CURRENT_SCHEMA = \"${SCHEMA}\";
 @${f}"

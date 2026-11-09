@@ -5,3 +5,6 @@
 *.log
 .DS_Store
 .claude/
+
+# Dados reais do cliente gerados do CSV (scripts/csv-para-sql.py)
+/docker/oracle/sql/03-dados-cliente.sql
