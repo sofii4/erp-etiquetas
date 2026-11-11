@@ -8,3 +8,6 @@
 
 # Dados reais do cliente gerados do CSV (scripts/csv-para-sql.py)
 /docker/oracle/sql/03-dados-cliente.sql
+
+# Requisitos internos do projeto (não versionar)
+/prompt.txt

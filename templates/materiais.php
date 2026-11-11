@@ -42,7 +42,6 @@
                     <path d="M7 12h10"/>
                 </svg>
                 Escanear QR Code
-                <span class="ml-1 px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 text-[10px] font-black uppercase tracking-wider">Fase 2</span>
             </button>
         </div>
     </header>
