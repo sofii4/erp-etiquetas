@@ -12,7 +12,7 @@
     <div class="p-6 flex flex-col gap-5">
         <div class="flex items-start justify-between gap-4">
             <div>
-                <span class="px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 text-[10px] font-black uppercase tracking-wider">Em breve · Fase 2</span>
+                <span class="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 text-[10px] font-black uppercase tracking-wider">Em breve</span>
                 <h2 id="modal-scanner-titulo" class="text-xl font-black mt-2">Escanear QR Code</h2>
             </div>
             <button type="button" data-fechar class="p-2 -m-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800" aria-label="Fechar">

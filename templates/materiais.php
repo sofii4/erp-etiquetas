@@ -22,10 +22,10 @@
 <div class="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-6">
 
     <!-- Cabeçalho -->
-    <header class="relative overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950 shadow-2xl">
+    <header class="relative overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-br from-gray-900 via-gray-900 to-blue-950 shadow-2xl">
         <div class="relative p-6 md:p-8 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
             <div>
-                <p class="text-xs uppercase tracking-widest text-indigo-300 font-bold">Estoque · <?= e($appName) ?></p>
+                <p class="text-xs uppercase tracking-widest text-blue-300 font-bold">Estoque · <?= e($appName) ?></p>
                 <h1 class="text-2xl md:text-4xl font-black text-white mt-1">Materiais e Etiquetas</h1>
                 <p class="text-sm text-gray-400 mt-2 max-w-2xl">
                     Encontre o material e imprima a etiqueta com QR Code. O QR guarda o código do material.
@@ -35,7 +35,7 @@
             <!-- Fase 2: leitura de QR Code. Fica visível para o usuário saber onde
                  vai estar; abre só um mockup explicativo. -->
             <button type="button" id="btn-scanner"
-                    class="self-start lg:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-gray-600 bg-gray-900/60 text-gray-400 text-sm font-bold hover:border-indigo-400 hover:text-gray-200 transition"
+                    class="self-start lg:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-gray-600 bg-gray-900/60 text-gray-400 text-sm font-bold hover:border-blue-400 hover:text-gray-200 transition"
                     aria-haspopup="dialog" aria-controls="modal-scanner">
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
@@ -75,7 +75,7 @@
             </label>
         </div>
         <div class="flex flex-wrap items-center gap-3 mt-4">
-            <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition">
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition">
                 Buscar
             </button>
             <button type="reset" class="px-5 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-bold border border-gray-700 transition">

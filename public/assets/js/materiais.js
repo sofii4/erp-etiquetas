@@ -97,7 +97,7 @@
     const linhaMaterial = (m, termo) => {
         const tr = el('tr', 'linha-material');
 
-        const tdCodigo = el('td', 'px-4 py-3 font-mono font-bold text-indigo-200 whitespace-nowrap', m.CD_MATERIAL);
+        const tdCodigo = el('td', 'px-4 py-3 font-mono font-bold text-blue-200 whitespace-nowrap', m.CD_MATERIAL);
         const tdDesc = el('td', 'px-4 py-3 text-gray-200 md:min-w-[16rem]');
         tdDesc.appendChild(descricaoComDestaque(m.DESCRICAO, termo));
         // No celular as colunas abaixo somem; local e unidade vão sob a descrição.
