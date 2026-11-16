@@ -5,7 +5,7 @@ Módulo que complementa o ERP: consulta os materiais da tabela `ESMATERI` (Oracl
 **O que já funciona (Fase 1)**
 
 - Tela de consulta de materiais, com filtros por código, descrição e grupo/subgrupo, e com paginação.
-- **Imagem de cada material**, guardada no banco: miniatura na tabela e ampliação ao clicar. A tela **só exibe**: incluir, trocar ou remover imagens é feito direto no banco (veja [Manutenção das imagens](#manutenção-das-imagens)).
+- **Imagem de cada material**, guardada no banco: miniatura na tabela e ampliação ao clicar. Material sem imagem mostra "Sem foto". A tela **só exibe**: incluir, trocar ou remover imagens é feito direto no banco (veja [Manutenção das imagens](#manutenção-das-imagens)).
 - Etiqueta em PDF (padrão 100 × 50 mm, configurável) com os dados do material e o QR Code.
 - Botão **Escanear QR Code**, ainda só visual (mockup). Ele reserva o lugar da Fase 2, a movimentação de estoque pela leitura do QR Code.
 
@@ -101,10 +101,11 @@ projeto-erp/
 ### Como as peças se conectam
 
 ```
-Navegador ──► nginx (porta 8190) ──► PHP-FPM (Slim) ──► Oracle (ESMATERI)
+Navegador ──► nginx (porta 8190) ──► PHP-FPM (Slim) ──► Oracle (ESMATERI + MATERIAL_IMAGEM)
                                          │
-                                         ├─ QrCodeService  → imagem do QR
-                                         └─ EtiquetaService → PDF da etiqueta
+                                         ├─ QrCodeService   → imagem do QR
+                                         ├─ EtiquetaService → PDF da etiqueta
+                                         └─ ImagemController → imagem do material (MATERIAL_IMAGEM)
 ```
 
 O Compose sobe três containers na mesma rede:
@@ -193,7 +194,7 @@ O `-u` faz a pasta `vendor/` ficar com o seu usuário, e não com o root.
 docker compose exec php php scripts/gerar-imagens-ficticias.php
 ```
 
-O script só preenche os materiais **sem** imagem. Com `--refazer`, ele regera as que já são fictícias. Imagens enviadas por usuários nunca são sobrescritas.
+O script só preenche os materiais **sem** imagem. Com `--refazer`, ele regera as que já são fictícias. Imagens reais (`FICTICIA = 'N'`, gravadas pelo script de manutenção ou por SQL) nunca são sobrescritas. Com `--previa=var/previa`, ele só grava os PNGs na pasta, sem mexer no banco.
 
 ### 7. Acessar
 
@@ -217,7 +218,7 @@ Se o Docker roda numa VM, troque `localhost` pelo IP da VM.
 - Host: `localhost` (ou o IP da VM)
 - Porta: `1521` (variável `ORACLE_HOST_PORT`)
 - Service name: `XEPDB1`
-- Usuário: `ETIQUETAS_APP` com a senha de `DB_PASS`. Ele só consegue ler os dados.
+- Usuário: `ETIQUETAS_APP` com a senha de `DB_PASS`. Na `ESMATERI` ele só consegue ler. A `MATERIAL_IMAGEM` pertence a ele, então é por esse usuário que se alteram as imagens via SQL.
 
 ---
 
