@@ -5,8 +5,9 @@
 #
 #   - "db_tst"      : dono da ESMATERI, como no ERP. Schema-only (sem senha,
 #                     ninguém faz login com ele).
-#   - ${DB_USER}    : usuário da aplicação, só com SELECT na ESMATERI
-#                     (espelha o usuário read-only pedido para a AWS).
+#   - ${DB_USER}    : usuário da aplicação. Só tem SELECT na ESMATERI
+#                     (espelha o usuário read-only pedido para a AWS) e é
+#                     dono da tabela própria MATERIAL_IMAGEM (04-*.sql).
 #
 # Os SQLs de docker/oracle/sql/ não têm nome de schema nem de PDB, então
 # servem também para o 19c e para outros ambientes.
@@ -35,8 +36,10 @@ roda_sql "
 CREATE USER \"${SCHEMA}\" NO AUTHENTICATION
     DEFAULT TABLESPACE USERS QUOTA UNLIMITED ON USERS;
 
+-- QUOTA: a tabela de imagens fica no schema da aplicação. Não damos
+-- CREATE TABLE: a tabela é criada aqui pelo setup, não pela app.
 CREATE USER ${APP_USER} IDENTIFIED BY \"${APP_PASS}\"
-    DEFAULT TABLESPACE USERS;
+    DEFAULT TABLESPACE USERS QUOTA UNLIMITED ON USERS;
 GRANT CREATE SESSION TO ${APP_USER};
 "
 
@@ -56,5 +59,12 @@ done
 
 echo "ERP: liberando leitura para ${APP_USER}..."
 roda_sql "GRANT SELECT ON \"${SCHEMA}\".ESMATERI TO ${APP_USER};"
+
+# Tabela própria do módulo (imagens), no schema da aplicação.
+for f in "$SQL_DIR"/04-*.sql; do
+    echo "ERP: rodando $(basename "$f")..."
+    roda_sql "ALTER SESSION SET CURRENT_SCHEMA = ${APP_USER};
+@${f}"
+done
 
 echo "ERP: setup concluído."

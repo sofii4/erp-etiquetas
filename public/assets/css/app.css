@@ -76,3 +76,64 @@ mark { background: rgb(96 165 250 / .25); color: inherit; border-radius: 2px; }
 
 dialog[open] { animation: aparecer .15s ease-out; }
 @keyframes aparecer { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+
+/* ── Imagens dos materiais ── */
+
+/* Miniatura da tabela: tamanho fixo (sem "pulo" de layout enquanto carrega),
+   fundo claro porque as fotos de produto costumam ter fundo branco. */
+.miniatura {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 0.75rem;
+    background: #e5e9f0;
+    overflow: hidden;
+    cursor: zoom-in;
+    transition: transform .15s, box-shadow .15s;
+}
+@media (min-width: 640px) {
+    .miniatura { width: 4rem; height: 4rem; }
+}
+.miniatura img { width: 100%; height: 100%; object-fit: contain; }
+.miniatura:hover:not(.vazia) { transform: scale(1.06); box-shadow: 0 6px 18px rgb(0 0 0 / .35); }
+
+.miniatura.vazia {
+    background: transparent;
+    cursor: default;
+    border: 1.5px dashed #1f2937;
+    color: #4b5563;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    text-align: center;
+    line-height: 1.2;
+}
+
+/* Palco do modal: quadrado, imagem inteira (contain) */
+.imagem-palco {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    max-height: 65vh;
+    border-radius: 1.25rem;
+    background: #e5e9f0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+.imagem-palco img { width: 100%; height: 100%; object-fit: contain; }
+.selo-ficticia {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: rgb(3 7 18 / .75);
+    color: #fcd34d;
+    font-size: 0.625rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}

@@ -14,23 +14,32 @@ use InvalidArgumentException;
  *  - nada de recursos 21c/23ai (BOOLEAN em SQL, IF EXISTS, SELECT sem FROM DUAL...);
  *  - só as colunas usadas — a tabela tem 106.
  *
+ * A ESMATERI só é LIDA. A imagem vem de MATERIAL_IMAGEM (LEFT JOIN).
+ *
  * O ERP grava "vazio" como ' ' nas colunas VARCHAR2 NOT NULL; TRIM(' ') no
  * Oracle vira NULL, então a API devolve null nesses casos.
  */
 final class MaterialRepository
 {
+    // "m." = ESMATERI; "i." = MATERIAL_IMAGEM (tabela própria do módulo, no
+    // schema da aplicação). Do lado da imagem só vem o HASH: o BLOB é baixado
+    // à parte, pela URL /api/materiais/{cd}/imagem?v={hash}.
     private const COLUNAS = <<<'SQL'
-        TRIM(CD_MATERIAL)     AS CD_MATERIAL,
-        TRIM(DESCRICAO)       AS DESCRICAO,
-        TRIM(CD_GRUPO)        AS CD_GRUPO,
-        TRIM(CD_SUB_GRUPO)    AS CD_SUB_GRUPO,
-        TRIM(CD_UNIDADE_MEDI) AS CD_UNIDADE_MEDI,
-        TRIM(LOCALIZACAO)     AS LOCALIZACAO,
-        TO_CHAR(DT_CADASTRO,    'YYYY-MM-DD"T"HH24:MI:SS') AS DT_CADASTRO,
-        TO_CHAR(DT_MODIFICACAO, 'YYYY-MM-DD"T"HH24:MI:SS') AS DT_MODIFICACAO,
-        TRIM(USUARIO_CRIACAO) AS USUARIO_CRIACAO,
-        TRIM(USUARIO_MODIFIC) AS USUARIO_MODIFIC
+        TRIM(m.CD_MATERIAL)     AS CD_MATERIAL,
+        TRIM(m.DESCRICAO)       AS DESCRICAO,
+        TRIM(m.CD_GRUPO)        AS CD_GRUPO,
+        TRIM(m.CD_SUB_GRUPO)    AS CD_SUB_GRUPO,
+        TRIM(m.CD_UNIDADE_MEDI) AS CD_UNIDADE_MEDI,
+        TRIM(m.LOCALIZACAO)     AS LOCALIZACAO,
+        TO_CHAR(m.DT_CADASTRO,    'YYYY-MM-DD"T"HH24:MI:SS') AS DT_CADASTRO,
+        TO_CHAR(m.DT_MODIFICACAO, 'YYYY-MM-DD"T"HH24:MI:SS') AS DT_MODIFICACAO,
+        TRIM(m.USUARIO_CRIACAO) AS USUARIO_CRIACAO,
+        TRIM(m.USUARIO_MODIFIC) AS USUARIO_MODIFIC,
+        i.HASH                  AS IMAGEM_HASH,
+        i.FICTICIA              AS IMAGEM_FICTICIA
         SQL;
+
+    private const JOIN_IMAGEM = 'LEFT JOIN MATERIAL_IMAGEM i ON i.CD_MATERIAL = m.CD_MATERIAL';
 
     public const POR_PAGINA_MAX = 100;
 
@@ -61,15 +70,16 @@ final class MaterialRepository
         [$where, $binds] = $this->montarFiltros($filtros);
 
         $total = (int) ($this->db->queryOne(
-            "SELECT COUNT(*) AS TOTAL FROM {$this->tabela} {$where}",
+            "SELECT COUNT(*) AS TOTAL FROM {$this->tabela} m {$where}",
             $binds
         )['TOTAL'] ?? 0);
 
         $dados = $total === 0 ? [] : $this->db->query(
             'SELECT ' . self::COLUNAS . "
-               FROM {$this->tabela}
+               FROM {$this->tabela} m
+               " . self::JOIN_IMAGEM . "
                {$where}
-              ORDER BY CD_MATERIAL
+              ORDER BY m.CD_MATERIAL
              OFFSET :pular ROWS FETCH NEXT :qtd ROWS ONLY",
             $binds + ['pular' => ($pagina - 1) * $porPagina, 'qtd' => $porPagina]
         );
@@ -81,7 +91,7 @@ final class MaterialRepository
     public function porCodigo(string $cdMaterial): ?array
     {
         return $this->db->queryOne(
-            'SELECT ' . self::COLUNAS . " FROM {$this->tabela} WHERE CD_MATERIAL = :cd",
+            'SELECT ' . self::COLUNAS . " FROM {$this->tabela} m " . self::JOIN_IMAGEM . ' WHERE m.CD_MATERIAL = :cd',
             ['cd' => $cdMaterial]
         );
     }
@@ -123,25 +133,25 @@ final class MaterialRepository
         if ($codigo !== '') {
             // Prefixo: o código é hierárquico (grupo+sub+seq) e assim o índice
             // KESMATERI1 é aproveitado.
-            $condicoes[] = "CD_MATERIAL LIKE :codigo ESCAPE '\\'";
+            $condicoes[] = "m.CD_MATERIAL LIKE :codigo ESCAPE '\\'";
             $binds['codigo'] = self::escaparLike($codigo) . '%';
         }
 
         $descricao = trim((string) ($filtros['descricao'] ?? ''));
         if ($descricao !== '') {
-            $condicoes[] = "UPPER(DESCRICAO) LIKE :descricao ESCAPE '\\'";
+            $condicoes[] = "UPPER(m.DESCRICAO) LIKE :descricao ESCAPE '\\'";
             $binds['descricao'] = '%' . self::escaparLike(mb_strtoupper($descricao)) . '%';
         }
 
         $grupo = trim((string) ($filtros['grupo'] ?? ''));
         if ($grupo !== '') {
-            $condicoes[] = 'CD_GRUPO = :grupo';
+            $condicoes[] = 'm.CD_GRUPO = :grupo';
             $binds['grupo'] = $grupo;
         }
 
         $subgrupo = trim((string) ($filtros['subgrupo'] ?? ''));
         if ($subgrupo !== '') {
-            $condicoes[] = 'CD_SUB_GRUPO = :subgrupo';
+            $condicoes[] = 'm.CD_SUB_GRUPO = :subgrupo';
             $binds['subgrupo'] = $subgrupo;
         }
 

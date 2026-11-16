@@ -3,6 +3,9 @@
  *
  * Os filtros ficam na URL (?descricao=...&pagina=2), então F5, voltar do PDF
  * e compartilhar o link mantêm a mesma busca.
+ *
+ * Imagens: miniatura em cada linha (clique amplia). Só visualização — as
+ * imagens são mantidas direto no banco (MATERIAL_IMAGEM).
  */
 (() => {
     'use strict';
@@ -94,33 +97,76 @@
 
     // ── Busca ────────────────────────────────────
 
+    // ── Imagem do material ───────────────────────
+    //
+    // A lista só traz IMAGEM_HASH; a miniatura (WebP ~1 KB, gravada no banco)
+    // vem por <img loading="lazy">. O hash vai na URL, então o navegador
+    // guarda a imagem em cache até ela mudar.
+
+    const urlImagem = (cd, hash, tam) =>
+        `/api/materiais/${encodeURIComponent(cd)}/imagem?tam=${tam}&v=${encodeURIComponent(hash)}`;
+
+    /** Materiais da página atual, por código (o modal usa). */
+    const materiaisDaPagina = new Map();
+
+    /** Célula da imagem: botão que amplia, ou um marcador "sem foto". */
+    const miniatura = (m) => {
+        if (!m.IMAGEM_HASH) {
+            const vazio = el('span', 'miniatura vazia', 'Sem foto');
+            vazio.title = 'Material sem imagem';
+            return vazio;
+        }
+        const botao = el('button', 'miniatura');
+        botao.type = 'button';
+        botao.dataset.acao = 'imagem';
+        botao.title = m.IMAGEM_FICTICIA === 'S' ? 'Imagem ilustrativa · clique para ampliar' : 'Clique para ampliar';
+        botao.setAttribute('aria-label', `Ampliar imagem de ${m.DESCRICAO ?? m.CD_MATERIAL}`);
+        const img = el('img');
+        img.src = urlImagem(m.CD_MATERIAL, m.IMAGEM_HASH, 'mini');
+        img.alt = '';
+        img.width = 64;
+        img.height = 64;
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        botao.appendChild(img);
+        return botao;
+    };
+
     const linhaMaterial = (m, termo) => {
         const tr = el('tr', 'linha-material');
+        tr.dataset.cd = m.CD_MATERIAL;
 
-        const tdCodigo = el('td', 'px-4 py-3 font-mono font-bold text-blue-200 whitespace-nowrap', m.CD_MATERIAL);
-        const tdDesc = el('td', 'px-4 py-3 text-gray-200 md:min-w-[16rem]');
-        tdDesc.appendChild(descricaoComDestaque(m.DESCRICAO, termo));
-        // No celular as colunas abaixo somem; local e unidade vão sob a descrição.
-        tdDesc.appendChild(el('div', 'md:hidden mt-1 text-xs font-mono text-gray-500',
-            `${m.LOCALIZACAO ?? '—'} · ${m.CD_UNIDADE_MEDI ?? '—'}`));
-        const oculto = 'hidden md:table-cell ';
-        const tdGrupo = el('td', oculto + 'px-4 py-3 font-mono text-gray-400 whitespace-nowrap', `${m.CD_GRUPO ?? '—'} / ${m.CD_SUB_GRUPO ?? '—'}`);
-        const tdUn = el('td', oculto + 'px-4 py-3 text-gray-400', m.CD_UNIDADE_MEDI ?? '—');
-        const tdLocal = el('td', oculto + 'px-4 py-3 font-mono text-gray-300 whitespace-nowrap', m.LOCALIZACAO ?? '—');
-        const tdData = el('td', oculto + 'px-4 py-3 text-gray-500 whitespace-nowrap', formatarData(m.DT_CADASTRO));
+        // Miniatura: clique amplia.
+        const tdImg = el('td', 'pl-3 pr-1 sm:pl-4 py-2.5 align-middle');
+        tdImg.appendChild(miniatura(m));
 
-        const tdAcao = el('td', 'px-4 py-3 text-right');
-        const link = el('a', 'btn-etiqueta', 'Imprimir');
+        // Material: descrição em destaque, código e (em telas menores) local/un.
+        const tdMat = el('td', 'px-3 sm:px-4 py-2.5 align-middle min-w-[11rem]');
+        const desc = el('div', 'text-gray-100 font-semibold leading-snug');
+        desc.appendChild(descricaoComDestaque(m.DESCRICAO, termo));
+        const cod = el('div', 'mt-1 font-mono text-xs font-bold text-blue-300', m.CD_MATERIAL);
+        const extra = el('div', 'lg:hidden mt-0.5 text-xs text-gray-500',
+            `Local ${m.LOCALIZACAO ?? '—'} · ${m.CD_UNIDADE_MEDI ?? '—'}`);
+        tdMat.append(desc, cod, extra);
+
+        const tdGrupo = el('td', 'hidden md:table-cell px-4 py-2.5 font-mono text-gray-400 whitespace-nowrap', `${m.CD_GRUPO ?? '—'} / ${m.CD_SUB_GRUPO ?? '—'}`);
+        const tdUn = el('td', 'hidden md:table-cell px-4 py-2.5 text-gray-400', m.CD_UNIDADE_MEDI ?? '—');
+        const tdLocal = el('td', 'hidden lg:table-cell px-4 py-2.5 font-mono text-gray-300 whitespace-nowrap', m.LOCALIZACAO ?? '—');
+        const tdData = el('td', 'hidden lg:table-cell px-4 py-2.5 text-gray-500 whitespace-nowrap', formatarData(m.DT_CADASTRO));
+
+        const tdAcao = el('td', 'pl-2 pr-3 sm:px-4 py-2.5 text-right');
+        const link = el('a', 'btn-etiqueta');
         link.href = `/etiquetas/${encodeURIComponent(m.CD_MATERIAL)}`;
         link.target = '_blank';
         link.rel = 'noopener';
         link.title = `Abrir etiqueta de ${m.CD_MATERIAL} (PDF) para imprimir`;
         const icone = el('span', '', '⎙');
         icone.setAttribute('aria-hidden', 'true');
-        link.prepend(icone);
+        link.append(icone, el('span', 'hidden sm:inline', 'Imprimir'));
+        link.setAttribute('aria-label', `Imprimir etiqueta de ${m.CD_MATERIAL}`);
         tdAcao.appendChild(link);
 
-        tr.append(tdCodigo, tdDesc, tdGrupo, tdUn, tdLocal, tdData, tdAcao);
+        tr.append(tdImg, tdMat, tdGrupo, tdUn, tdLocal, tdData, tdAcao);
         return tr;
     };
 
@@ -177,6 +223,8 @@
         }
 
         estado.className = 'hidden';
+        materiaisDaPagina.clear();
+        for (const m of dados) materiaisDaPagina.set(m.CD_MATERIAL, m);
         tbody.replaceChildren(...dados.map((m) => linhaMaterial(m, termo)));
 
         const ini = (pag - 1) * porPagina + 1;
@@ -230,6 +278,38 @@
     modal.querySelector('[data-fechar]').addEventListener('click', () => modal.close());
     // Clique fora do conteúdo (no backdrop) fecha.
     modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.close(); });
+
+
+    // ── Imagem ampliada (só visualização) ────────
+
+    const modalImg = document.getElementById('modal-imagem');
+    const mImg = modalImg.querySelector('[data-imagem]');
+    let cdModal = null;
+
+    const mostrarNoModal = (m) => {
+        cdModal = m.CD_MATERIAL;
+        modalImg.querySelector('[data-codigo]').textContent = m.CD_MATERIAL;
+        modalImg.querySelector('#modal-imagem-titulo').textContent = m.DESCRICAO ?? '—';
+        modalImg.querySelector('[data-ficticia]').classList.toggle('hidden', m.IMAGEM_FICTICIA !== 'S');
+        // A miniatura (já em cache) aparece na hora; a grande substitui ao chegar.
+        mImg.src = urlImagem(m.CD_MATERIAL, m.IMAGEM_HASH, 'mini');
+        mImg.alt = `Imagem de ${m.DESCRICAO ?? m.CD_MATERIAL}`;
+        const grande = new Image();
+        grande.onload = () => { if (cdModal === m.CD_MATERIAL) mImg.src = grande.src; };
+        grande.src = urlImagem(m.CD_MATERIAL, m.IMAGEM_HASH, 'grande');
+    };
+
+    tbody.addEventListener('click', (ev) => {
+        const botao = ev.target.closest('[data-acao="imagem"]');
+        if (!botao) return;
+        const m = materiaisDaPagina.get(botao.closest('tr').dataset.cd);
+        if (!m?.IMAGEM_HASH) return;
+        mostrarNoModal(m);
+        modalImg.showModal();
+    });
+    modalImg.querySelector('[data-fechar]').addEventListener('click', () => modalImg.close());
+    modalImg.addEventListener('click', (ev) => { if (ev.target === modalImg) modalImg.close(); });
+    modalImg.addEventListener('close', () => { cdModal = null; });
 
     // ── Início: restaura filtros da URL ──────────
 

@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 use App\Controllers\EtiquetaController;
 use App\Controllers\HealthController;
+use App\Controllers\ImagemController;
 use App\Controllers\LeituraController;
 use App\Controllers\MaterialController;
+use App\Repositories\ImagemRepository;
 use App\Repositories\MaterialRepository;
 use App\Services\EtiquetaService;
 use App\Services\QrCodeService;
@@ -31,6 +33,7 @@ $dbConfig = require $raiz . '/config/database.php';
 // o Oracle só abre na primeira consulta.
 $db         = OracleConnection::fromConfig($dbConfig);
 $materiais  = new MaterialRepository($db, $dbConfig['schema']);
+$imagens    = new ImagemRepository($db);
 $etiquetas  = new EtiquetaService(
     new QrCodeService(),
     $raiz . '/templates/etiqueta.php',
@@ -41,6 +44,7 @@ $etiquetas  = new EtiquetaService(
 $health    = new HealthController($db);
 $material  = new MaterialController($materiais, $raiz . '/templates', $config['name']);
 $etiqueta  = new EtiquetaController($materiais, $etiquetas);
+$imagem    = new ImagemController($imagens);
 $leitura   = new LeituraController();
 
 // ── App ───────────────────────────────────────
@@ -58,6 +62,9 @@ $app->get('/materiais', [$material, 'index']);
 // API — o front (passo 8) e, na Fase 2, o leitor de QR usam estas rotas.
 $app->get('/api/materiais', [$material, 'listar']);
 $app->get('/api/materiais/{cd}', [$material, 'detalhe']);
+// Imagem do material (gravada no banco, em WebP). Só leitura: alterações
+// são feitas direto no banco.
+$app->get('/api/materiais/{cd}/imagem', [$imagem, 'mostrar']);
 $app->get('/api/grupos', [$material, 'grupos']);
 $app->get('/api/grupos/{grupo}/subgrupos', [$material, 'subgrupos']);
 

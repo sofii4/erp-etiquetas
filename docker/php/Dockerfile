@@ -17,7 +17,7 @@ ENV ORACLE_HOME=/opt/oracle/instantclient \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libaio1t64 unzip curl ca-certificates \
-        libpng-dev libjpeg62-turbo-dev libfreetype6-dev libzip-dev \
+        libpng-dev libjpeg62-turbo-dev libfreetype6-dev libwebp-dev libzip-dev \
     && ln -sf /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -32,11 +32,13 @@ RUN mkdir -p /opt/oracle \
     && echo /opt/oracle/instantclient > /etc/ld.so.conf.d/oracle-instantclient.conf \
     && ldconfig
 
-# OCI8 3.3.x é a linha para PHP 8.3 (3.4+ exige PHP 8.4)
+# OCI8 3.3.x é a linha para PHP 8.3 (3.4+ exige PHP 8.4).
+# gd com WebP: as imagens dos materiais são gravadas no banco em WebP.
+# exif: lê a orientação das fotos tiradas no celular.
 RUN echo "instantclient,/opt/oracle/instantclient" | pecl install oci8-3.3.0 \
     && docker-php-ext-enable oci8 \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" gd zip
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install -j"$(nproc)" gd zip exif
 
 # Composer dentro da imagem: assim o `composer install` enxerga oci8/gd de verdade.
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

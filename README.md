@@ -5,10 +5,24 @@ Módulo que complementa o ERP: consulta os materiais da tabela `ESMATERI` (Oracl
 **O que já funciona (Fase 1)**
 
 - Tela de consulta de materiais, com filtros por código, descrição e grupo/subgrupo, e com paginação.
+- **Imagem de cada material**, guardada no banco: miniatura na tabela e ampliação ao clicar. A tela **só exibe**: incluir, trocar ou remover imagens é feito direto no banco (veja [Manutenção das imagens](#manutenção-das-imagens)).
 - Etiqueta em PDF (padrão 100 × 50 mm, configurável) com os dados do material e o QR Code.
 - Botão **Escanear QR Code**, ainda só visual (mockup). Ele reserva o lugar da Fase 2, a movimentação de estoque pela leitura do QR Code.
 
-A aplicação acessa o banco **só para leitura**: o usuário dela tem apenas `SELECT` na `ESMATERI`.
+A `ESMATERI` do ERP é acessada **só para leitura**: o usuário da aplicação tem apenas `SELECT` nela. As imagens ficam numa tabela própria do módulo (`MATERIAL_IMAGEM`), no schema do usuário da aplicação.
+
+### Como as imagens são guardadas
+
+- Ficam **no Oracle, em BLOB**, nunca em arquivo no servidor.
+- A tela não altera nada no banco. As rotas de imagem da API são só `GET`.
+- Pelo script de manutenção, qualquer arquivo (JPG, PNG, WebP ou GIF, até 10 MB) vira **WebP** em duas versões:
+  - **imagem**: até 1024 px, ~5–100 KB;
+  - **miniatura**: até 160 px, ~1 KB.
+
+  A rotação das fotos de celular (EXIF) é corrigida e os metadados (GPS, câmera) são descartados. No teste, uma foto de 1,2 MB virou 95 KB no banco.
+- A miniatura fica guardada *dentro* da linha da tabela e a imagem grande fica fora dela (SECUREFILE). A listagem só lê o `HASH` (LEFT JOIN), nunca o BLOB.
+- As imagens são servidas com `ETag` e `Cache-Control: immutable`, usando o `HASH` na URL. O trigger `TRG_MATERIAL_IMAGEM_VERSAO` gera um `HASH` novo a cada inclusão ou alteração, inclusive as feitas à mão por SQL. Assim o navegador nunca fica preso numa imagem antiga.
+- O export do cliente não tem fotos. Por isso `scripts/gerar-imagens-ficticias.php` desenha **ilustrações** por tipo de material (parafuso, porca, tubo, perfil, chapa, motorredutor, elevador...). Elas são marcadas com o selo "Imagem ilustrativa" e com `FICTICIA = 'S'`.
 
 ---
 
@@ -39,13 +53,16 @@ projeto-erp/
 │   ├── Controllers/
 │   │   ├── MaterialController.php   # tela /materiais e API de materiais/grupos
 │   │   ├── EtiquetaController.php   # gera a etiqueta (PDF ou HTML)
+│   │   ├── ImagemController.php     # entrega a imagem do material (só leitura)
 │   │   ├── LeituraController.php    # reservado para a Fase 2 (responde 501)
 │   │   └── HealthController.php     # /health: verifica app + banco
 │   ├── Repositories/
-│   │   └── MaterialRepository.php   # todo o SQL da ESMATERI (bind variables)
+│   │   ├── MaterialRepository.php   # todo o SQL da ESMATERI (bind variables)
+│   │   └── ImagemRepository.php     # SQL da MATERIAL_IMAGEM (BLOBs)
 │   ├── Services/
 │   │   ├── QrCodeService.php        # gera o QR Code do CD_MATERIAL
-│   │   └── EtiquetaService.php      # monta o PDF da etiqueta
+│   │   ├── EtiquetaService.php      # monta o PDF da etiqueta
+│   │   └── ImagemService.php        # reduz e converte a imagem para WebP
 │   └── Support/                     # conexão Oracle, JSON, templates, helpers
 ├── config/
 │   ├── app.php                      # nome, ambiente, debug
@@ -58,19 +75,24 @@ projeto-erp/
 │       ├── init/01-setup.sh         # 1º boot: cria usuários, tabela e dados
 │       └── sql/
 │           ├── 02-ddl-esmateri.sql  # estrutura da tabela ESMATERI
-│           └── 03-mocks.sql         # 22 materiais fictícios para teste
+│           ├── 03-mocks.sql         # 22 materiais fictícios para teste
+│           └── 04-material-imagem.sql # tabela das imagens (do módulo)
 ├── public/
 │   ├── index.php                    # ponto de entrada e rotas
 │   └── assets/                      # CSS e JS da tela
 ├── templates/
 │   ├── materiais.php                # tela de consulta
 │   ├── etiqueta.php                 # layout da etiqueta
-│   └── partials/modal-scanner.php   # janela (mockup) do leitor de QR
+│   └── partials/
+│       ├── modal-scanner.php        # janela (mockup) do leitor de QR
+│       └── modal-imagem.php         # imagem ampliada
 ├── scripts/
 │   ├── start.sh                     # sobe tudo
 │   ├── stop.sh                      # para os containers
 │   ├── reset.sh                     # apaga o banco local e recomeça
-│   └── csv-para-sql.py              # converte o CSV do cliente em INSERTs
+│   ├── csv-para-sql.py              # converte o CSV do cliente em INSERTs
+│   ├── imagem-material.php          # inclui/troca/remove a imagem de um material
+│   └── gerar-imagens-ficticias.php  # ilustrações para os materiais sem imagem
 ├── docker-compose.yml
 ├── .env.docker.example              # modelo do .env
 └── composer.json
@@ -98,6 +120,7 @@ O Compose sobe três containers na mesma rede:
 | GET | `/materiais` | Tela de consulta (`/` redireciona para cá) |
 | GET | `/api/materiais` | Lista materiais com filtros e paginação |
 | GET | `/api/materiais/{cd}` | Detalhe de um material |
+| GET | `/api/materiais/{cd}/imagem` | Imagem do material (`?tam=mini\|grande`, `&v={hash}` para cache longo) |
 | GET | `/api/grupos` | Lista de grupos |
 | GET | `/api/grupos/{grupo}/subgrupos` | Subgrupos de um grupo |
 | GET | `/etiquetas/{cd}` | Etiqueta em PDF (`?formato=html` para pré-visualizar) |
@@ -164,7 +187,15 @@ docker compose exec -u $(id -u):$(id -g) -e COMPOSER_HOME=/tmp/composer php comp
 
 O `-u` faz a pasta `vendor/` ficar com o seu usuário, e não com o root.
 
-### 6. Acessar
+### 6. (Opcional) Gerar imagens ilustrativas
+
+```bash
+docker compose exec php php scripts/gerar-imagens-ficticias.php
+```
+
+O script só preenche os materiais **sem** imagem. Com `--refazer`, ele regera as que já são fictícias. Imagens enviadas por usuários nunca são sobrescritas.
+
+### 7. Acessar
 
 - Sistema: <http://localhost:8190>
 - Teste rápido: <http://localhost:8190/health>
@@ -190,8 +221,55 @@ Se o Docker roda numa VM, troque `localhost` pelo IP da VM.
 
 ---
 
+## Manutenção das imagens
+
+A tela só mostra as imagens. Para incluir, trocar ou remover, altere a tabela `MATERIAL_IMAGEM` (schema do usuário da aplicação). Há dois caminhos.
+
+### Pelo script (recomendado: otimiza a imagem)
+
+Coloque o arquivo dentro do projeto (por exemplo, em `var/`) e rode:
+
+```bash
+# incluir ou trocar
+docker compose exec php php scripts/imagem-material.php importar 2000100039 var/foto.jpg
+
+# remover
+docker compose exec php php scripts/imagem-material.php remover 2000100039
+```
+
+O script confere se o material existe na `ESMATERI` e se o arquivo é mesmo uma imagem. Depois converte para WebP, gera a miniatura e grava.
+
+### Direto por SQL (DBeaver, SQL Developer)
+
+Basta preencher `CD_MATERIAL` e `IMAGEM`, carregando o arquivo JPG, PNG, WebP ou GIF no campo BLOB. O resto é automático:
+
+- `MINIATURA` é opcional. Sem ela, a tela usa a própria `IMAGEM` reduzida pelo navegador. Funciona, mas a página fica mais pesada se a imagem for grande.
+- `HASH`, `BYTES_IMAGEM`, `BYTES_MINIATURA` e `DT_ATUALIZACAO` são preenchidos pelo trigger.
+- O tipo do arquivo é detectado pelo conteúdo, então a coluna `MIME` pode ficar vazia.
+
+```sql
+-- remover
+DELETE FROM MATERIAL_IMAGEM WHERE CD_MATERIAL = '2000100039';
+COMMIT;
+```
+
+Por esse caminho a imagem vai **sem otimização**. Prefira arquivos já pequenos (até ~1000 px), ou use o script.
+
+---
+
 ## Observações
 
 - **Schema:** a tabela pertence ao schema `"db_tst"`, escrito em minúsculas e por isso sempre entre aspas no SQL. Na AWS o nome real pode ser outro: basta mudar `DB_SCHEMA` no `.env`.
 - **Oracle 19c:** para validar na versão de produção, troque a imagem do serviço `oracle` no `docker-compose.yml` e o `DB_SERVICE` no `.env` (por exemplo, `ORCLPDB1`).
+- **Banco já existente (criado antes das imagens):** os scripts de init só rodam no primeiro boot. Para criar a tabela de imagens sem apagar o banco, rode:
+  ```bash
+  docker compose exec -T oracle bash -c 'sqlplus -s / as sysdba <<EOF
+  ALTER SESSION SET CONTAINER = ${DB_SERVICE};
+  ALTER USER ${DB_USER} QUOTA UNLIMITED ON USERS;
+  ALTER SESSION SET CURRENT_SCHEMA = ${DB_USER};
+  @/opt/erp-sql/04-material-imagem.sql
+  EOF'
+  ```
+  Depois de mudar o `Dockerfile` ou o `php.ini`, rode `docker compose build php` (o suporte a WebP e EXIF depende disso).
+- **Produção (AWS):** o usuário da aplicação precisa de cota num tablespace e da tabela `MATERIAL_IMAGEM` criada no schema dele (`04-material-imagem.sql`). A `ESMATERI` continua só com `SELECT`. A aplicação web não grava nada: quem altera imagens é o script de manutenção ou o SQL.
 - **Configuração:** dentro do Docker, o PHP recebe as configurações pelo ambiente, definidas no `docker-compose.yml`, e não lendo o `.env`. A senha do SYSTEM (`ORACLE_PASSWORD`) não é repassada à aplicação.

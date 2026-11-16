@@ -29,6 +29,7 @@
                 <h1 class="text-2xl md:text-4xl font-black text-white mt-1">Materiais e Etiquetas</h1>
                 <p class="text-sm text-gray-400 mt-2 max-w-2xl">
                     Encontre o material e imprima a etiqueta com QR Code. O QR guarda o código do material.
+                    Clique na imagem para ampliar.
                 </p>
             </div>
 
@@ -93,13 +94,13 @@
             <table class="w-full text-sm">
                 <thead class="bg-gray-950/60 text-left text-xs uppercase tracking-widest text-gray-500">
                     <tr>
-                        <th scope="col" class="px-4 py-3 font-bold">Código</th>
-                        <th scope="col" class="px-4 py-3 font-bold">Descrição</th>
+                        <th scope="col" class="pl-3 pr-1 sm:pl-4 py-3 font-bold w-0"><span class="sr-only">Imagem</span></th>
+                        <th scope="col" class="px-3 sm:px-4 py-3 font-bold">Material</th>
                         <th scope="col" class="hidden md:table-cell px-4 py-3 font-bold whitespace-nowrap">Grupo / Sub</th>
                         <th scope="col" class="hidden md:table-cell px-4 py-3 font-bold">Un.</th>
-                        <th scope="col" class="hidden md:table-cell px-4 py-3 font-bold">Localização</th>
-                        <th scope="col" class="hidden md:table-cell px-4 py-3 font-bold">Cadastro</th>
-                        <th scope="col" class="px-4 py-3 font-bold text-right">Etiqueta</th>
+                        <th scope="col" class="hidden lg:table-cell px-4 py-3 font-bold">Localização</th>
+                        <th scope="col" class="hidden lg:table-cell px-4 py-3 font-bold">Cadastro</th>
+                        <th scope="col" class="pl-2 pr-3 sm:px-4 py-3 font-bold text-right">Etiqueta</th>
                     </tr>
                 </thead>
                 <tbody id="linhas" class="divide-y divide-gray-800"></tbody>
@@ -118,5 +119,6 @@
 </div>
 
 <?php include __DIR__ . '/partials/modal-scanner.php'; ?>
+<?php include __DIR__ . '/partials/modal-imagem.php'; ?>
 </body>
 </html>
