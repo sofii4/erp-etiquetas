@@ -95,10 +95,14 @@ services:
     volumes:
       - ./public:/var/www/html/public:ro
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # Gerado por scripts/gerar-certificado.sh (fora do git).
+      - ./docker/nginx/certs:/etc/nginx/certs:ro
     networks:
       - erp_network
     ports:
       - "${WEB_HOST_PORT:-8190}:80"
+      # HTTPS: o navegador só libera a câmera em https ou em localhost.
+      - "${WEB_HTTPS_PORT:-8191}:443"
     healthcheck:
       # 127.0.0.1 e não localhost: no alpine localhost resolve para ::1 e o
       # nginx só escuta IPv4.

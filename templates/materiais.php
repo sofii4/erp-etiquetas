@@ -17,6 +17,8 @@
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="<?= asset('/assets/css/app.css') ?>">
     <script src="<?= asset('/assets/js/materiais.js') ?>" defer></script>
+    <script src="<?= asset('/assets/js/vendor/qr-scanner/qr-scanner.umd.min.js') ?>" defer></script>
+    <script src="<?= asset('/assets/js/scanner.js') ?>" defer></script>
 </head>
 <body class="bg-gray-950 text-white min-h-screen">
 <div class="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-6">
@@ -33,10 +35,9 @@
                 </p>
             </div>
 
-            <!-- Fase 2: leitura de QR Code. Fica visível para o usuário saber onde
-                 vai estar; abre só um mockup explicativo. -->
+            <!-- Leitura do QR Code da etiqueta (câmera ou coletor) → mostra o material. -->
             <button type="button" id="btn-scanner"
-                    class="self-start lg:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-gray-600 bg-gray-900/60 text-gray-400 text-sm font-bold hover:border-blue-400 hover:text-gray-200 transition"
+                    class="self-start lg:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-500/60 bg-blue-600/20 text-blue-100 text-sm font-bold hover:bg-blue-600/35 hover:border-blue-400 transition"
                     aria-haspopup="dialog" aria-controls="modal-scanner">
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>

@@ -59,7 +59,7 @@ $app->get('/health', [$health, 'verificar']);
 $app->get('/', fn ($req, $res) => $res->withHeader('Location', '/materiais')->withStatus(302));
 $app->get('/materiais', [$material, 'index']);
 
-// API — o front (passo 8) e, na Fase 2, o leitor de QR usam estas rotas.
+// API — usada pela tela de materiais e pelo leitor de QR (scanner.js).
 $app->get('/api/materiais', [$material, 'listar']);
 $app->get('/api/materiais/{cd}', [$material, 'detalhe']);
 // Imagem do material (gravada no banco, em WebP). Só leitura: alterações

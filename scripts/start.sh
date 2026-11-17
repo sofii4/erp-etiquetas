@@ -10,6 +10,11 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+# Certificado HTTPS (câmera do leitor de QR). Gerado uma vez só.
+if [ ! -f docker/nginx/certs/erp.crt ]; then
+    scripts/gerar-certificado.sh
+fi
+
 echo "🔨 Building images..."
 docker compose build
 
@@ -20,5 +25,7 @@ docker compose ps
 
 PORTA=$(grep -E '^WEB_HOST_PORT=' .env | cut -d= -f2)
 echo ""
+PORTA_HTTPS=$(grep -E '^WEB_HTTPS_PORT=' .env | cut -d= -f2)
 echo "✅ Sistema disponível em: http://localhost:${PORTA:-8190}"
+echo "🔒 HTTPS (leitor de QR pelo celular): https://<ip-da-vm>:${PORTA_HTTPS:-8191}"
 echo "📊 Logs: docker compose logs -f"

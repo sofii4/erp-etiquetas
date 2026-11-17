@@ -11,3 +11,6 @@
 
 # Requisitos internos do projeto (não versionar)
 /prompt.txt
+
+# Certificado HTTPS local (scripts/gerar-certificado.sh)
+/docker/nginx/certs/

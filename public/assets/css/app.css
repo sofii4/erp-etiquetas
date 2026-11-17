@@ -48,7 +48,7 @@ button:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
 /* Destaque do trecho buscado na descrição */
 mark { background: rgb(96 165 250 / .25); color: inherit; border-radius: 2px; }
 
-/* ── Mockup do scanner (Fase 2) ── */
+/* ── Leitor de QR Code ── */
 .scanner-area {
     position: relative;
     aspect-ratio: 1;
@@ -73,6 +73,29 @@ mark { background: rgb(96 165 250 / .25); color: inherit; border-radius: 2px; }
 @media (prefers-reduced-motion: reduce) {
     .scanner-area .linha-leitura { animation: none; top: 50%; }
 }
+.scanner-area video {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+}
+.scanner-area .canto, .scanner-area .linha-leitura { z-index: 1; }
+/* Sem imagem da câmera ainda: esconde a linha animada (parece que está lendo). */
+.scanner-area:not(.ativa) .linha-leitura { display: none; }
+.scanner-status {
+    position: relative; z-index: 1;
+    padding: 0 1.5rem; text-align: center;
+    font-size: .75rem; font-weight: 700; color: #9ca3af;
+    text-transform: uppercase; letter-spacing: .1em;
+}
+.resultado-foto {
+    flex: none;
+    display: grid; place-items: center;
+    width: 6rem; height: 6rem;
+    border-radius: 1rem;
+    background: #f9fafb;
+    overflow: hidden;
+}
+.resultado-foto img { width: 100%; height: 100%; object-fit: contain; }
 
 dialog[open] { animation: aparecer .15s ease-out; }
 @keyframes aparecer { from { opacity: 0; transform: translateY(8px) scale(.98); } }

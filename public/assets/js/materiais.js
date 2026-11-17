@@ -271,14 +271,7 @@
         if (pagina < totalPaginas) { pagina++; buscar(); }
     });
 
-    // ── Modal do scanner (Fase 2) ────────────────
-
-    const modal = document.getElementById('modal-scanner');
-    document.getElementById('btn-scanner').addEventListener('click', () => modal.showModal());
-    modal.querySelector('[data-fechar]').addEventListener('click', () => modal.close());
-    // Clique fora do conteúdo (no backdrop) fecha.
-    modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.close(); });
-
+    // O leitor de QR Code fica em scanner.js.
 
     // ── Imagem ampliada (só visualização) ────────
 

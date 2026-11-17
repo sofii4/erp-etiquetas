@@ -7,7 +7,15 @@ Módulo que complementa o ERP: consulta os materiais da tabela `ESMATERI` (Oracl
 - Tela de consulta de materiais, com filtros por código, descrição e grupo/subgrupo, e com paginação.
 - **Imagem de cada material**, guardada no banco: miniatura na tabela e ampliação ao clicar. Material sem imagem mostra "Sem foto". A tela **só exibe**: incluir, trocar ou remover imagens é feito direto no banco (veja [Manutenção das imagens](#manutenção-das-imagens)).
 - Etiqueta em PDF (padrão 100 × 50 mm, configurável) com os dados do material e o QR Code.
-- Botão **Escanear QR Code**, ainda só visual (mockup). Ele reserva o lugar da Fase 2, a movimentação de estoque pela leitura do QR Code.
+- Botão **Escanear QR Code**: lê o QR da etiqueta pela câmera (celular ou notebook) ou pelo campo de código e mostra o material, com atalhos para imprimir a etiqueta e filtrar a lista. A entrada e a saída de estoque (Fase 2) ainda não estão disponíveis.
+
+### Como funciona o leitor de QR Code
+
+- O QR guarda só o `CD_MATERIAL`. Depois da leitura, a tela busca o material em `GET /api/materiais/{cd}`.
+- A leitura pela câmera usa a biblioteca [qr-scanner](https://github.com/nimiq/qr-scanner) (MIT), salva em `public/assets/js/vendor/qr-scanner` (não depende de CDN). Ela usa o leitor nativo do navegador quando existe e, se não existir, um worker próprio.
+- **O navegador só libera a câmera em HTTPS ou em `localhost`.** Por isso o nginx também atende em HTTPS (porta `8191`), com um certificado autoassinado gerado por `scripts/gerar-certificado.sh`. Pelo celular, acesse `https://<ip-da-vm>:8191` e aceite o aviso de certificado uma vez. Em `http://`, a tela avisa e oferece o campo de código.
+- O campo de código também atende **coletores com leitor embutido**, que "digitam" o código lido e mandam Enter.
+- A câmera é desligada sempre que a janela fecha.
 
 A `ESMATERI` do ERP é acessada **só para leitura**: o usuário da aplicação tem apenas `SELECT` nela. As imagens ficam numa tabela própria do módulo (`MATERIAL_IMAGEM`), no schema do usuário da aplicação.
 
@@ -39,6 +47,7 @@ A `ESMATERI` do ERP é acessada **só para leitura**: o usuário da aplicação 
 | Configuração | vlucas/phpdotenv (`.env`) |
 | Servidor web | nginx 1.27 |
 | Front-end | HTML (templates PHP), Tailwind (arquivo local) e JavaScript puro |
+| Leitura de QR | [qr-scanner](https://github.com/nimiq/qr-scanner) (arquivo local) |
 | Infraestrutura | Docker + Docker Compose |
 
 O SQL usa apenas recursos que existem no Oracle 19c, para funcionar igual em produção.
@@ -79,17 +88,18 @@ projeto-erp/
 │           └── 04-material-imagem.sql # tabela das imagens (do módulo)
 ├── public/
 │   ├── index.php                    # ponto de entrada e rotas
-│   └── assets/                      # CSS e JS da tela
+│   └── assets/                      # CSS e JS da tela (scanner.js = leitor de QR)
 ├── templates/
 │   ├── materiais.php                # tela de consulta
 │   ├── etiqueta.php                 # layout da etiqueta
 │   └── partials/
-│       ├── modal-scanner.php        # janela (mockup) do leitor de QR
+│       ├── modal-scanner.php        # janela do leitor de QR (câmera ou código)
 │       └── modal-imagem.php         # imagem ampliada
 ├── scripts/
 │   ├── start.sh                     # sobe tudo
 │   ├── stop.sh                      # para os containers
 │   ├── reset.sh                     # apaga o banco local e recomeça
+│   ├── gerar-certificado.sh         # certificado HTTPS local (câmera)
 │   ├── csv-para-sql.py              # converte o CSV do cliente em INSERTs
 │   ├── imagem-material.php          # inclui/troca/remove a imagem de um material
 │   └── gerar-imagens-ficticias.php  # ilustrações para os materiais sem imagem
@@ -101,11 +111,11 @@ projeto-erp/
 ### Como as peças se conectam
 
 ```
-Navegador ──► nginx (porta 8190) ──► PHP-FPM (Slim) ──► Oracle (ESMATERI + MATERIAL_IMAGEM)
-                                         │
-                                         ├─ QrCodeService   → imagem do QR
-                                         ├─ EtiquetaService → PDF da etiqueta
-                                         └─ ImagemController → imagem do material (MATERIAL_IMAGEM)
+Navegador ──► nginx (8190 http / 8191 https) ──► PHP-FPM (Slim) ──► Oracle (ESMATERI + MATERIAL_IMAGEM)
+                                                    │
+                                                    ├─ QrCodeService   → imagem do QR
+                                                    ├─ EtiquetaService → PDF da etiqueta
+                                                      └─ ImagemController → imagem do material (MATERIAL_IMAGEM)
 ```
 
 O Compose sobe três containers na mesma rede:
@@ -178,7 +188,7 @@ O script gera `docker/oracle/sql/03-dados-cliente.sql`. Quando esse arquivo exis
 ./scripts/start.sh
 ```
 
-O script monta a imagem do PHP, sobe os três containers e espera todos ficarem prontos. No primeiro boot o Oracle leva **cerca de 1 minuto** para criar o banco, os usuários e a tabela.
+Na primeira vez o script gera o certificado HTTPS local (`docker/nginx/certs`, fora do git). Depois monta a imagem do PHP, sobe os três containers e espera todos ficarem prontos. No primeiro boot o Oracle leva **cerca de 1 minuto** para criar o banco, os usuários e a tabela.
 
 ### 5. Instalar as dependências PHP (só na primeira vez)
 
@@ -199,9 +209,10 @@ O script só preenche os materiais **sem** imagem. Com `--refazer`, ele regera a
 ### 7. Acessar
 
 - Sistema: <http://localhost:8190>
+- Com HTTPS (necessário para a câmera fora do `localhost`): <https://localhost:8191>
 - Teste rápido: <http://localhost:8190/health>
 
-Se o Docker roda numa VM, troque `localhost` pelo IP da VM.
+Se o Docker roda numa VM, troque `localhost` pelo IP da VM. Se o IP da VM mudar, rode `./scripts/gerar-certificado.sh` e `docker compose restart nginx`.
 
 ### Comandos do dia a dia
 
@@ -273,4 +284,5 @@ Por esse caminho a imagem vai **sem otimização**. Prefira arquivos já pequeno
   ```
   Depois de mudar o `Dockerfile` ou o `php.ini`, rode `docker compose build php` (o suporte a WebP e EXIF depende disso).
 - **Produção (AWS):** o usuário da aplicação precisa de cota num tablespace e da tabela `MATERIAL_IMAGEM` criada no schema dele (`04-material-imagem.sql`). A `ESMATERI` continua só com `SELECT`. A aplicação web não grava nada: quem altera imagens é o script de manutenção ou o SQL.
+- **HTTPS em produção:** o certificado autoassinado é só para desenvolvimento. Na AWS o HTTPS deve vir de um certificado válido (no balanceador ou no nginx).
 - **Configuração:** dentro do Docker, o PHP recebe as configurações pelo ambiente, definidas no `docker-compose.yml`, e não lendo o `.env`. A senha do SYSTEM (`ORACLE_PASSWORD`) não é repassada à aplicação.
