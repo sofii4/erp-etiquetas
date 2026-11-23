@@ -124,7 +124,7 @@ dialog[open] { animation: aparecer .15s ease-out; }
 
 .miniatura.vazia {
     background: transparent;
-    cursor: default;
+    cursor: pointer;
     border: 1.5px dashed #1f2937;
     color: #4b5563;
     font-size: 0.5625rem;
@@ -160,3 +160,41 @@ dialog[open] { animation: aparecer .15s ease-out; }
     text-transform: uppercase;
     letter-spacing: .08em;
 }
+.miniatura.vazia:hover { border-color: #60a5fa; color: #93c5fd; }
+
+.imagem-palco video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #030712; }
+.selo-previa {
+    position: absolute;
+    bottom: 0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.2rem 0.7rem;
+    border-radius: 999px;
+    background: rgb(3 7 18 / .75);
+    color: #93c5fd;
+    font-size: 0.625rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    white-space: nowrap;
+}
+
+/* Botões do modal da imagem */
+.btn-img {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid #374151;
+    background: #1f2937;
+    color: #e5e7eb;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+.btn-img:hover:not(:disabled) { border-color: #60a5fa; color: #fff; }
+.btn-img:disabled { opacity: .5; cursor: progress; }
+.btn-img-primario { background: #2563eb; border-color: #2563eb; color: #fff; }
+.btn-img-primario:hover:not(:disabled) { background: #3b82f6; }
+.btn-img-perigo { background: transparent; border-color: rgb(239 68 68 / .4); color: #fca5a5; }
+.btn-img-perigo:hover:not(:disabled) { border-color: #ef4444; color: #fecaca; background: rgb(239 68 68 / .1); }

@@ -31,7 +31,7 @@
                 <h1 class="text-2xl md:text-4xl font-black text-white mt-1">Materiais e Etiquetas</h1>
                 <p class="text-sm text-gray-400 mt-2 max-w-2xl">
                     Encontre o material e imprima a etiqueta com QR Code. O QR guarda o código do material.
-                    Clique na imagem para ampliar.
+                    Clique na imagem para ampliar ou para tirar/enviar uma foto.
                 </p>
             </div>
 

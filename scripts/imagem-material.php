@@ -2,8 +2,9 @@
 declare(strict_types=1);
 
 /**
- * Manutenção das imagens dos materiais (MATERIAL_IMAGEM). A tela só exibe;
- * incluir, trocar e remover é feito por aqui (ou direto por SQL).
+ * Manutenção das imagens dos materiais (MATERIAL_IMAGEM) pela linha de
+ * comando. A tela também inclui, troca e remove; aqui é para carga em lote
+ * ou quando não houver acesso à tela (ou direto por SQL).
  *
  * Por aqui a imagem é otimizada antes de ir para o banco: WebP de até
  * 1024 px + miniatura de 160 px, rotação de foto de celular corrigida e

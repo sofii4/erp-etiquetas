@@ -5,7 +5,7 @@ Módulo que complementa o ERP: consulta os materiais da tabela `ESMATERI` (Oracl
 **O que já funciona (Fase 1)**
 
 - Tela de consulta de materiais, com filtros por código, descrição e grupo/subgrupo, e com paginação.
-- **Imagem de cada material**, guardada no banco: miniatura na tabela e ampliação ao clicar. Material sem imagem mostra "Sem foto". A tela **só exibe**: incluir, trocar ou remover imagens é feito direto no banco (veja [Manutenção das imagens](#manutenção-das-imagens)).
+- **Imagem de cada material**, guardada no banco: miniatura na tabela e ampliação ao clicar. Pela tela dá para **tirar a foto com a câmera** ou **enviar um arquivo** (com prévia antes de salvar) e para remover a imagem. Material sem imagem mostra "+ Foto". Por enquanto não há controle de permissão: qualquer usuário pode alterar. Também dá para manter as imagens direto no banco (veja [Manutenção das imagens](#manutenção-das-imagens)).
 - Etiqueta em PDF (padrão 100 × 50 mm, configurável) com os dados do material e o QR Code.
 - Botão **Escanear QR Code**: lê o QR da etiqueta pela câmera (celular ou notebook) ou pelo campo de código e mostra o material, com atalhos para imprimir a etiqueta e filtrar a lista. A entrada e a saída de estoque (Fase 2) ainda não estão disponíveis.
 
@@ -22,8 +22,8 @@ A `ESMATERI` do ERP é acessada **só para leitura**: o usuário da aplicação 
 ### Como as imagens são guardadas
 
 - Ficam **no Oracle, em BLOB**, nunca em arquivo no servidor.
-- A tela não altera nada no banco. As rotas de imagem da API são só `GET`.
-- Pelo script de manutenção, qualquer arquivo (JPG, PNG, WebP ou GIF, até 10 MB) vira **WebP** em duas versões:
+- Câmera: no celular abre o app de câmera do aparelho; no computador abre o vídeo ao vivo no próprio modal (só em HTTPS ou `localhost`). Fotos grandes são reduzidas no navegador (até 2048 px) antes do envio.
+- Pela tela ou pelo script de manutenção, qualquer arquivo (JPG, PNG, WebP ou GIF, até 10 MB) vira **WebP** em duas versões:
   - **imagem**: até 1024 px, ~5–100 KB;
   - **miniatura**: até 160 px, ~1 KB.
 
@@ -62,7 +62,7 @@ projeto-erp/
 │   ├── Controllers/
 │   │   ├── MaterialController.php   # tela /materiais e API de materiais/grupos
 │   │   ├── EtiquetaController.php   # gera a etiqueta (PDF ou HTML)
-│   │   ├── ImagemController.php     # entrega a imagem do material (só leitura)
+│   │   ├── ImagemController.php     # mostra, grava e remove a imagem do material
 │   │   ├── LeituraController.php    # reservado para a Fase 2 (responde 501)
 │   │   └── HealthController.php     # /health: verifica app + banco
 │   ├── Repositories/
@@ -132,6 +132,8 @@ O Compose sobe três containers na mesma rede:
 | GET | `/api/materiais` | Lista materiais com filtros e paginação |
 | GET | `/api/materiais/{cd}` | Detalhe de um material |
 | GET | `/api/materiais/{cd}/imagem` | Imagem do material (`?tam=mini\|grande`, `&v={hash}` para cache longo) |
+| POST | `/api/materiais/{cd}/imagem` | Inclui ou troca a imagem (multipart, campo `imagem`, até 10 MB) |
+| DELETE | `/api/materiais/{cd}/imagem` | Remove a imagem |
 | GET | `/api/grupos` | Lista de grupos |
 | GET | `/api/grupos/{grupo}/subgrupos` | Subgrupos de um grupo |
 | GET | `/etiquetas/{cd}` | Etiqueta em PDF (`?formato=html` para pré-visualizar) |
@@ -235,7 +237,7 @@ Se o Docker roda numa VM, troque `localhost` pelo IP da VM. Se o IP da VM mudar,
 
 ## Manutenção das imagens
 
-A tela só mostra as imagens. Para incluir, trocar ou remover, altere a tabela `MATERIAL_IMAGEM` (schema do usuário da aplicação). Há dois caminhos.
+O jeito normal é pela tela (câmera ou arquivo). Também dá para incluir, trocar ou remover direto na tabela `MATERIAL_IMAGEM` (schema do usuário da aplicação). Há dois caminhos.
 
 ### Pelo script (recomendado: otimiza a imagem)
 

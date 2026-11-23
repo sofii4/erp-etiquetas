@@ -11,7 +11,7 @@ use Throwable;
  * da aplicação (por isso sem prefixo de schema). Ver
  * docker/oracle/sql/04-material-imagem.sql.
  *
- * A tela só usa ler(). salvar()/remover() são dos scripts de manutenção
+ * Usado pela tela (ImagemController) e pelos scripts de manutenção
  * (scripts/imagem-material.php e gerar-imagens-ficticias.php).
  */
 final class ImagemRepository

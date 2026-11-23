@@ -4,7 +4,7 @@
 --
 -- O 01-setup.sh roda este arquivo com CURRENT_SCHEMA = DB_USER.
 --
--- A tela só MOSTRA as imagens. Incluir, trocar ou remover é feito no banco:
+-- A tela mostra, inclui (câmera/arquivo), troca e remove. Também dá pelo banco:
 --  - recomendado: scripts/imagem-material.php (reduz e converte para WebP,
 --    gera a miniatura) — ver README;
 --  - ou direto por SQL/DBeaver/SQL Developer: basta CD_MATERIAL + IMAGEM
@@ -59,7 +59,7 @@ BEGIN
 END;
 /
 
-COMMENT ON TABLE "MATERIAL_IMAGEM" IS 'Imagem de cada material da ESMATERI (mantida direto no banco; a tela só exibe)';
+COMMENT ON TABLE "MATERIAL_IMAGEM" IS 'Imagem de cada material da ESMATERI (enviada pela tela ou pelo script de manutenção)';
 COMMENT ON COLUMN "MATERIAL_IMAGEM"."CD_MATERIAL" IS 'Mesmo CD_MATERIAL da ESMATERI';
 COMMENT ON COLUMN "MATERIAL_IMAGEM"."IMAGEM" IS 'JPG, PNG, WebP ou GIF (pelo script: WebP até 1024 px)';
 COMMENT ON COLUMN "MATERIAL_IMAGEM"."MINIATURA" IS 'Opcional: versão pequena para a tabela (sem ela a tela usa IMAGEM)';

@@ -9,6 +9,7 @@ use App\Controllers\MaterialController;
 use App\Repositories\ImagemRepository;
 use App\Repositories\MaterialRepository;
 use App\Services\EtiquetaService;
+use App\Services\ImagemService;
 use App\Services\QrCodeService;
 use App\Support\OracleConnection;
 use Slim\Factory\AppFactory;
@@ -44,7 +45,7 @@ $etiquetas  = new EtiquetaService(
 $health    = new HealthController($db);
 $material  = new MaterialController($materiais, $raiz . '/templates', $config['name']);
 $etiqueta  = new EtiquetaController($materiais, $etiquetas);
-$imagem    = new ImagemController($imagens);
+$imagem    = new ImagemController($imagens, $materiais, new ImagemService());
 $leitura   = new LeituraController();
 
 // ── App ───────────────────────────────────────
@@ -62,9 +63,11 @@ $app->get('/materiais', [$material, 'index']);
 // API — usada pela tela de materiais e pelo leitor de QR (scanner.js).
 $app->get('/api/materiais', [$material, 'listar']);
 $app->get('/api/materiais/{cd}', [$material, 'detalhe']);
-// Imagem do material (gravada no banco, em WebP). Só leitura: alterações
-// são feitas direto no banco.
+// Imagem do material (gravada no banco, em WebP). A tela envia pela câmera
+// ou por arquivo. Sem controle de permissão por enquanto.
 $app->get('/api/materiais/{cd}/imagem', [$imagem, 'mostrar']);
+$app->post('/api/materiais/{cd}/imagem', [$imagem, 'salvar']);
+$app->delete('/api/materiais/{cd}/imagem', [$imagem, 'remover']);
 $app->get('/api/grupos', [$material, 'grupos']);
 $app->get('/api/grupos/{grupo}/subgrupos', [$material, 'subgrupos']);
 
