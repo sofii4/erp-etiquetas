@@ -2,14 +2,18 @@
 -- Imagens dos materiais — tabela PRÓPRIA do módulo, no schema do usuário da
 -- aplicação. A ESMATERI (do ERP) continua intocada e só com SELECT.
 --
+-- Cada material tem até DUAS imagens: uma linha por imagem, com POSICAO 1
+-- (principal: miniatura da tabela, leitor de QR) ou 2. A aplicação mantém
+-- a regra "a 2 só existe se houver a 1": ao remover a 1, a 2 é promovida.
+--
 -- O 01-setup.sh roda este arquivo com CURRENT_SCHEMA = DB_USER.
 --
 -- A tela mostra, inclui (câmera/arquivo), troca e remove. Também dá pelo banco:
 --  - recomendado: scripts/imagem-material.php (reduz e converte para WebP,
 --    gera a miniatura) — ver README;
 --  - ou direto por SQL/DBeaver/SQL Developer: basta CD_MATERIAL + IMAGEM
---    (JPG, PNG, WebP ou GIF). MINIATURA é opcional (sem ela a tela usa a
---    IMAGEM) e o trigger abaixo cuida de HASH, tamanhos e data.
+--    (JPG, PNG, WebP ou GIF); POSICAO vale 1 se omitida. MINIATURA é
+--    opcional (sem ela a tela usa a IMAGEM) e o trigger abaixo cuida de HASH, tamanhos e data.
 --
 -- Otimizações:
 --  - Pelo script, IMAGEM fica com até 1024 px (~10–100 KB) e MINIATURA com
@@ -28,6 +32,7 @@ WHENEVER SQLERROR EXIT SQL.SQLCODE
 
 CREATE TABLE "MATERIAL_IMAGEM" (
     "CD_MATERIAL"     VARCHAR2(20 BYTE)  NOT NULL,
+    "POSICAO"         NUMBER(1,0)        DEFAULT 1 NOT NULL,
     "MIME"            VARCHAR2(30 BYTE),
     "LARGURA"         NUMBER(5,0),
     "ALTURA"          NUMBER(5,0),
@@ -39,7 +44,8 @@ CREATE TABLE "MATERIAL_IMAGEM" (
     "DT_ATUALIZACAO"  DATE               DEFAULT SYSDATE NOT NULL,
     "MINIATURA"       BLOB,
     "IMAGEM"          BLOB               NOT NULL,
-    CONSTRAINT "PK_MATERIAL_IMAGEM" PRIMARY KEY ("CD_MATERIAL"),
+    CONSTRAINT "PK_MATERIAL_IMAGEM" PRIMARY KEY ("CD_MATERIAL", "POSICAO"),
+    CONSTRAINT "CK_MATERIAL_IMAGEM_POS" CHECK ("POSICAO" IN (1, 2)),
     CONSTRAINT "CK_MATERIAL_IMAGEM_FICT" CHECK ("FICTICIA" IN ('S', 'N'))
 )
 LOB ("MINIATURA") STORE AS SECUREFILE (ENABLE STORAGE IN ROW CACHE)
@@ -59,8 +65,9 @@ BEGIN
 END;
 /
 
-COMMENT ON TABLE "MATERIAL_IMAGEM" IS 'Imagem de cada material da ESMATERI (enviada pela tela ou pelo script de manutenção)';
+COMMENT ON TABLE "MATERIAL_IMAGEM" IS 'Imagens (até duas) de cada material da ESMATERI (enviadas pela tela ou pelo script de manutenção)';
 COMMENT ON COLUMN "MATERIAL_IMAGEM"."CD_MATERIAL" IS 'Mesmo CD_MATERIAL da ESMATERI';
+COMMENT ON COLUMN "MATERIAL_IMAGEM"."POSICAO" IS '1 = principal (miniatura da tabela), 2 = segunda imagem';
 COMMENT ON COLUMN "MATERIAL_IMAGEM"."IMAGEM" IS 'JPG, PNG, WebP ou GIF (pelo script: WebP até 1024 px)';
 COMMENT ON COLUMN "MATERIAL_IMAGEM"."MINIATURA" IS 'Opcional: versão pequena para a tabela (sem ela a tela usa IMAGEM)';
 COMMENT ON COLUMN "MATERIAL_IMAGEM"."HASH" IS 'Versão da imagem (ETag/URL); preenchido pelo trigger';

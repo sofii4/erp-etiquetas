@@ -4,8 +4,10 @@
  * Os filtros ficam na URL (?descricao=...&pagina=2), então F5, voltar do PDF
  * e compartilhar o link mantêm a mesma busca.
  *
- * Imagens: miniatura em cada linha. O clique abre o modal, que amplia e
- * permite tirar foto (câmera), enviar arquivo ou remover (MATERIAL_IMAGEM).
+ * Imagens: até duas por material (MATERIAL_IMAGEM, posição 1 = principal).
+ * A linha mostra a miniatura da principal (com selo "2" se houver a segunda).
+ * O clique abre o modal, que amplia, alterna entre as duas e permite tirar
+ * foto (câmera), enviar arquivo, remover ou tornar principal.
  */
 (() => {
     'use strict';
@@ -99,12 +101,20 @@
 
     // ── Imagem do material ───────────────────────
     //
-    // A lista só traz IMAGEM_HASH; a miniatura (WebP ~1 KB, gravada no banco)
-    // vem por <img loading="lazy">. O hash vai na URL, então o navegador
-    // guarda a imagem em cache até ela mudar.
+    // A lista só traz os hashes (IMAGEM_HASH = principal, IMAGEM2_HASH = a
+    // segunda); a miniatura (WebP ~1 KB, gravada no banco) vem por
+    // <img loading="lazy">. O hash vai na URL, então o navegador guarda a
+    // imagem em cache até ela mudar.
 
-    const urlImagem = (cd, hash, tam) =>
-        `/api/materiais/${encodeURIComponent(cd)}/imagem?tam=${tam}&v=${encodeURIComponent(hash)}`;
+    const urlImagem = (cd, pos, hash, tam) =>
+        `/api/materiais/${encodeURIComponent(cd)}/imagem/${pos}?tam=${tam}&v=${encodeURIComponent(hash)}`;
+
+    /** Hash e "fictícia?" da imagem 1 ou 2 do material. */
+    const foto = (m, pos) => pos === 2
+        ? { hash: m?.IMAGEM2_HASH ?? null, ficticia: m?.IMAGEM2_FICTICIA === 'S' }
+        : { hash: m?.IMAGEM_HASH ?? null, ficticia: m?.IMAGEM_FICTICIA === 'S' };
+
+    const CAMPOS_IMAGEM = ['IMAGEM_HASH', 'IMAGEM_FICTICIA', 'IMAGEM2_HASH', 'IMAGEM2_FICTICIA'];
 
     /** Materiais da página atual, por código (o modal usa). */
     const materiaisDaPagina = new Map();
@@ -120,16 +130,23 @@
             botao.setAttribute('aria-label', `Adicionar imagem de ${m.DESCRICAO ?? m.CD_MATERIAL}`);
             return botao;
         }
-        botao.title = m.IMAGEM_FICTICIA === 'S' ? 'Imagem ilustrativa · clique para ampliar ou trocar' : 'Clique para ampliar ou trocar';
-        botao.setAttribute('aria-label', `Ampliar imagem de ${m.DESCRICAO ?? m.CD_MATERIAL}`);
+        const duas = Boolean(m.IMAGEM2_HASH);
+        botao.title = (m.IMAGEM_FICTICIA === 'S' ? 'Imagem ilustrativa · ' : '')
+            + (duas ? '2 imagens · ' : '') + 'clique para ampliar ou trocar';
+        botao.setAttribute('aria-label', `Ampliar ${duas ? 'imagens' : 'imagem'} de ${m.DESCRICAO ?? m.CD_MATERIAL}`);
         const img = el('img');
-        img.src = urlImagem(m.CD_MATERIAL, m.IMAGEM_HASH, 'mini');
+        img.src = urlImagem(m.CD_MATERIAL, 1, m.IMAGEM_HASH, 'mini');
         img.alt = '';
         img.width = 64;
         img.height = 64;
         img.loading = 'lazy';
         img.decoding = 'async';
         botao.appendChild(img);
+        if (duas) {
+            const qtd = el('span', 'miniatura-qtd', '2');
+            qtd.setAttribute('aria-hidden', 'true');
+            botao.appendChild(qtd);
+        }
         return botao;
     };
 
@@ -291,6 +308,8 @@
     const inputArquivo = $m('[data-input-arquivo]');
     const inputCamera = $m('[data-input-camera]');
     const btnRemover = $m('[data-remover]');
+    const btnPrincipal = $m('[data-principal]');
+    const slots = [...modalImg.querySelectorAll('[data-foto]')];
     const btnTrocarCam = $m('[data-trocar-camera]');
     const btnSalvar = $m('[data-salvar]');
 
@@ -300,6 +319,7 @@
     const celular = window.matchMedia('(pointer: coarse)').matches;
 
     let mAtual = null;        // material aberto no modal
+    let posAtual = 1;         // imagem escolhida no seletor (1 = principal, 2)
     let previa = null;        // { blob, url, origem: 'camera' | 'arquivo' }
     let stream = null;        // MediaStream da câmera ao vivo
     let cameras = [];
@@ -335,9 +355,11 @@
         if (novo !== 'previa') descartarPrevia();
 
         const m = mAtual;
+        const f = foto(m, posAtual);
         mVideo.classList.toggle('hidden', novo !== 'camera');
         $m('[data-selo-previa]').classList.toggle('hidden', novo !== 'previa');
-        $m('[data-ficticia]').classList.toggle('hidden', !(novo === 'ver' && m?.IMAGEM_FICTICIA === 'S' && m?.IMAGEM_HASH));
+        $m('[data-ficticia]').classList.toggle('hidden', !(novo === 'ver' && f.hash && f.ficticia));
+        desenharSlots();
 
         if (novo === 'previa') {
             mImg.src = previa.url;
@@ -348,27 +370,73 @@
             mImg.classList.add('hidden');
             mSemFoto.classList.add('hidden');
         } else {
-            const tem = Boolean(m?.IMAGEM_HASH);
+            const tem = Boolean(f.hash);
+            const pos = posAtual;
             mImg.classList.toggle('hidden', !tem);
             mSemFoto.classList.toggle('hidden', tem);
+            mSemFoto.textContent = pos === 2 ? 'Sem a segunda foto' : 'Sem foto';
             btnRemover.classList.toggle('hidden', !tem);
+            btnPrincipal.classList.toggle('hidden', !(tem && pos === 2));
             if (tem) {
                 // A miniatura (já em cache) aparece na hora; a grande substitui ao chegar.
-                mImg.src = urlImagem(m.CD_MATERIAL, m.IMAGEM_HASH, 'mini');
-                mImg.alt = `Imagem de ${m.DESCRICAO ?? m.CD_MATERIAL}`;
+                mImg.src = urlImagem(m.CD_MATERIAL, pos, f.hash, 'mini');
+                mImg.alt = `Imagem ${pos} de ${m.DESCRICAO ?? m.CD_MATERIAL}`;
                 const grande = new Image();
                 grande.onload = () => {
-                    if (mAtual === m && modalImg.dataset.modo === 'ver') mImg.src = grande.src;
+                    if (mAtual === m && posAtual === pos && modalImg.dataset.modo === 'ver') mImg.src = grande.src;
                 };
-                grande.src = urlImagem(m.CD_MATERIAL, m.IMAGEM_HASH, 'grande');
+                grande.src = urlImagem(m.CD_MATERIAL, pos, f.hash, 'grande');
             } else {
                 mImg.removeAttribute('src');
             }
         }
     };
 
+    /**
+     * Seletor das duas imagens. A 2 só fica disponível depois da principal;
+     * durante câmera/prévia/envio o seletor trava (a ação vale para a imagem
+     * escolhida).
+     */
+    const desenharSlots = () => {
+        const m = mAtual;
+        const livre = modalImg.dataset.modo === 'ver' && !enviando;
+        for (const slot of slots) {
+            const pos = Number(slot.dataset.foto);
+            const f = foto(m, pos);
+            const bloqueada = pos === 2 && !m?.IMAGEM_HASH;
+            slot.replaceChildren();
+            slot.classList.toggle('vazia', !f.hash);
+            slot.setAttribute('aria-pressed', String(pos === posAtual));
+            slot.disabled = !livre || bloqueada;
+            const nome = pos === 1 ? 'Principal' : 'Foto 2';
+            if (f.hash) {
+                const img = el('img');
+                img.src = urlImagem(m.CD_MATERIAL, pos, f.hash, 'mini');
+                img.alt = '';
+                img.decoding = 'async';
+                slot.append(img, el('span', 'foto-slot-rotulo', nome));
+                slot.title = `Ver ${pos === 1 ? 'a imagem principal' : 'a segunda imagem'}`;
+            } else {
+                slot.textContent = pos === 1 ? '+ Principal' : '+ Foto 2';
+                slot.title = bloqueada ? 'Adicione a imagem principal primeiro' : 'Adicionar a segunda imagem';
+            }
+            slot.setAttribute('aria-label', `${pos === 1 ? 'Imagem principal' : 'Segunda imagem'}${f.hash ? '' : ' (vazia)'}`);
+        }
+    };
+
+    for (const slot of slots) {
+        slot.addEventListener('click', () => {
+            const pos = Number(slot.dataset.foto);
+            if (pos === posAtual || modalImg.dataset.modo !== 'ver') return;
+            posAtual = pos;
+            msg('');
+            modo('ver');
+        });
+    }
+
     const abrirModal = (m) => {
         mAtual = m;
+        posAtual = 1;
         $m('[data-codigo]').textContent = m.CD_MATERIAL;
         $m('#modal-imagem-titulo').textContent = m.DESCRICAO ?? '—';
         msg('');
@@ -491,10 +559,10 @@
 
     // ── Gravar / remover ─────────────────────────
 
-    /** Atualiza o material na página e a miniatura da linha. */
-    const aplicarNoMaterial = (cd, campos) => {
+    /** Atualiza o material na página (hashes das duas imagens) e a miniatura da linha. */
+    const aplicarNoMaterial = (cd, corpo) => {
         const m = materiaisDaPagina.get(cd) ?? mAtual;
-        Object.assign(m, campos);
+        for (const campo of CAMPOS_IMAGEM) m[campo] = corpo?.[campo] ?? null;
         const celula = tbody.querySelector(`tr[data-cd="${CSS.escape(cd)}"] td`);
         celula?.replaceChildren(miniatura(m));
         return m;
@@ -503,26 +571,32 @@
     const ocupado = (sim) => {
         enviando = sim;
         for (const b of modalImg.querySelectorAll('[data-acoes] button')) b.disabled = sim;
+        desenharSlots();
     };
+
+    const urlApi = (cd, sufixo) => `/api/materiais/${encodeURIComponent(cd)}/imagem/${sufixo}`;
 
     btnSalvar.addEventListener('click', async () => {
         if (!previa || enviando) return;
         const cd = mAtual.CD_MATERIAL;
+        const pos = posAtual;
         const dados = new FormData();
         dados.append('imagem', previa.blob, previa.blob.name || 'imagem.jpg');
         ocupado(true);
         btnSalvar.textContent = 'Salvando…';
         try {
-            const resp = await fetch(`/api/materiais/${encodeURIComponent(cd)}/imagem`, {
+            const resp = await fetch(urlApi(cd, pos), {
                 method: 'POST',
                 body: dados,
                 headers: { Accept: 'application/json' },
             });
             const corpo = await resp.json().catch(() => ({}));
             if (!resp.ok) throw new Error(corpo.erro || (resp.status === 413 ? 'Imagem maior que 10 MB.' : `Erro ${resp.status} ao salvar a imagem.`));
-            mAtual = aplicarNoMaterial(cd, { IMAGEM_HASH: corpo.IMAGEM_HASH, IMAGEM_FICTICIA: corpo.IMAGEM_FICTICIA ?? 'N' });
+            mAtual = aplicarNoMaterial(cd, corpo);
+            // O servidor grava a 2 como 1 se ainda não houver a principal.
+            if (pos === 2 && !mAtual.IMAGEM2_HASH) posAtual = 1;
             modo('ver');
-            msg('Imagem salva.', 'ok');
+            msg(posAtual === 1 ? 'Imagem principal salva.' : 'Segunda imagem salva.', 'ok');
         } catch (erro) {
             msg(erro.message || 'Não foi possível salvar a imagem. Tente de novo.');
         } finally {
@@ -531,22 +605,52 @@
         }
     });
 
+    /** Recarrega o material (usado quando a imagem já não existia: 404). */
+    const recarregarMaterial = async (cd) => {
+        const resp = await fetch(`/api/materiais/${encodeURIComponent(cd)}`, { headers: { Accept: 'application/json' } });
+        if (!resp.ok) throw new Error(`Erro ${resp.status} ao atualizar o material.`);
+        return resp.json();
+    };
+
     btnRemover.addEventListener('click', async () => {
-        if (enviando || !mAtual?.IMAGEM_HASH) return;
-        if (!confirm(`Remover a imagem de ${mAtual.CD_MATERIAL}?`)) return;
+        const pos = posAtual;
+        if (enviando || !foto(mAtual, pos).hash) return;
+        const temSegunda = pos === 1 && Boolean(mAtual.IMAGEM2_HASH);
+        const aviso = pos === 1
+            ? `Remover a imagem principal de ${mAtual.CD_MATERIAL}?` + (temSegunda ? ' A segunda imagem passa a ser a principal.' : '')
+            : `Remover a segunda imagem de ${mAtual.CD_MATERIAL}?`;
+        if (!confirm(aviso)) return;
         const cd = mAtual.CD_MATERIAL;
         ocupado(true);
         try {
-            const resp = await fetch(`/api/materiais/${encodeURIComponent(cd)}/imagem`, { method: 'DELETE' });
-            if (!resp.ok && resp.status !== 404) {
-                const corpo = await resp.json().catch(() => ({}));
-                throw new Error(corpo.erro || `Erro ${resp.status} ao remover a imagem.`);
-            }
-            mAtual = aplicarNoMaterial(cd, { IMAGEM_HASH: null, IMAGEM_FICTICIA: null });
+            const resp = await fetch(urlApi(cd, pos), { method: 'DELETE', headers: { Accept: 'application/json' } });
+            const corpo = await resp.json().catch(() => ({}));
+            if (!resp.ok && resp.status !== 404) throw new Error(corpo.erro || `Erro ${resp.status} ao remover a imagem.`);
+            mAtual = aplicarNoMaterial(cd, resp.ok ? corpo : await recarregarMaterial(cd));
+            posAtual = 1;
             modo('ver');
-            msg('Imagem removida.', 'ok');
+            msg(temSegunda ? 'Imagem removida. A segunda imagem agora é a principal.' : 'Imagem removida.', 'ok');
         } catch (erro) {
             msg(erro.message || 'Não foi possível remover a imagem.');
+        } finally {
+            ocupado(false);
+        }
+    });
+
+    btnPrincipal.addEventListener('click', async () => {
+        if (enviando || !mAtual?.IMAGEM_HASH || !mAtual?.IMAGEM2_HASH) return;
+        const cd = mAtual.CD_MATERIAL;
+        ocupado(true);
+        try {
+            const resp = await fetch(urlApi(cd, 'inverter'), { method: 'POST', headers: { Accept: 'application/json' } });
+            const corpo = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(corpo.erro || `Erro ${resp.status} ao trocar a imagem principal.`);
+            mAtual = aplicarNoMaterial(cd, corpo);
+            posAtual = 1;
+            modo('ver');
+            msg('Esta agora é a imagem principal.', 'ok');
+        } catch (erro) {
+            msg(erro.message || 'Não foi possível trocar a imagem principal.');
         } finally {
             ocupado(false);
         }

@@ -13,11 +13,16 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Message\UploadedFileInterface;
 
 /**
- * Imagem do material, guardada no banco (MATERIAL_IMAGEM).
+ * Imagens do material (até duas), guardadas no banco (MATERIAL_IMAGEM).
+ * {pos} é 1 (principal) ou 2; sem /{pos}, vale a 1.
  *
- *   GET    /api/materiais/{cd}/imagem?tam=mini|grande&v={hash}
- *   POST   /api/materiais/{cd}/imagem   (multipart, campo "imagem")
- *   DELETE /api/materiais/{cd}/imagem
+ *   GET    /api/materiais/{cd}/imagem[/{pos}]?tam=mini|grande&v={hash}
+ *   POST   /api/materiais/{cd}/imagem[/{pos}]   (multipart, campo "imagem")
+ *   DELETE /api/materiais/{cd}/imagem[/{pos}]   (remover a 1 promove a 2)
+ *   POST   /api/materiais/{cd}/imagem/inverter  (a 2 vira a principal)
+ *
+ * POST e DELETE respondem com o material atualizado (IMAGEM_HASH e
+ * IMAGEM2_HASH novos), para a tela não precisar adivinhar as posições.
  *
  * A tela envia foto da câmera ou arquivo. O ImagemService converte para WebP
  * (1024 px + miniatura de 160 px) antes de gravar.
@@ -33,7 +38,7 @@ final class ImagemController
     ) {
     }
 
-    /** POST — inclui ou troca a imagem. Responde com o hash novo. */
+    /** POST — inclui ou troca uma imagem. Responde com o material atualizado. */
     public function salvar(Request $request, Response $response, array $args): Response
     {
         $cd = self::codigo($args);
@@ -61,24 +66,38 @@ final class ImagemController
             return Json::erro($response, $e->getMessage(), 422);
         }
 
-        $this->imagens->salvar($cd, $img);
+        $this->imagens->salvar($cd, $img, posicao: self::posicao($args));
 
-        // Material já com o IMAGEM_HASH novo (gerado pelo trigger).
+        // Material já com os hashes novos (gerados pelo trigger).
         return Json::responder($response, $this->materiais->porCodigo($cd), 201);
     }
 
-    /** DELETE — remove a imagem do material. */
+    /** DELETE — remove uma imagem. Responde com o material atualizado. */
     public function remover(Request $request, Response $response, array $args): Response
     {
         $cd = self::codigo($args);
         if ($cd === null) {
             return Json::erro($response, 'Código de material inválido.', 400);
         }
-        if (!$this->imagens->remover($cd)) {
-            return Json::erro($response, 'Material sem imagem.', 404);
+        if (!$this->imagens->remover($cd, self::posicao($args))) {
+            return Json::erro($response, 'Material sem essa imagem.', 404);
         }
 
-        return $response->withStatus(204);
+        return Json::responder($response, $this->materiais->porCodigo($cd));
+    }
+
+    /** POST — troca a imagem 1 com a 2. Responde com o material atualizado. */
+    public function inverter(Request $request, Response $response, array $args): Response
+    {
+        $cd = self::codigo($args);
+        if ($cd === null) {
+            return Json::erro($response, 'Código de material inválido.', 400);
+        }
+        if (!$this->imagens->inverter($cd)) {
+            return Json::erro($response, 'O material precisa ter as duas imagens.', 409);
+        }
+
+        return Json::responder($response, $this->materiais->porCodigo($cd));
     }
 
     public function mostrar(Request $request, Response $response, array $args): Response
@@ -87,7 +106,7 @@ final class ImagemController
         $q = $request->getQueryParams();
         $tamanho = ($q['tam'] ?? 'mini') === 'grande' ? 'grande' : 'mini';
 
-        $img = $cd === null ? null : $this->imagens->ler($cd, $tamanho);
+        $img = $cd === null ? null : $this->imagens->ler($cd, self::posicao($args), $tamanho);
         if ($img === null) {
             return Json::erro($response, 'Material sem imagem.', 404);
         }
@@ -126,6 +145,12 @@ final class ImagemController
         return in_array($mime, ['image/webp', 'image/jpeg', 'image/png', 'image/gif'], true)
             ? $mime
             : 'application/octet-stream';
+    }
+
+    /** A rota só aceita 1 ou 2 ({pos:[12]}); sem o segmento, é a principal. */
+    private static function posicao(array $args): int
+    {
+        return (int) ($args['pos'] ?? 1) === 2 ? 2 : 1;
     }
 
     /** @param array<string, string> $args */

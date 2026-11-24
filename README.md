@@ -5,7 +5,7 @@ Módulo que complementa o ERP: consulta os materiais da tabela `ESMATERI` (Oracl
 **O que já funciona (Fase 1)**
 
 - Tela de consulta de materiais, com filtros por código, descrição e grupo/subgrupo, e com paginação.
-- **Imagem de cada material**, guardada no banco: miniatura na tabela e ampliação ao clicar. Pela tela dá para **tirar a foto com a câmera** ou **enviar um arquivo** (com prévia antes de salvar) e para remover a imagem. Material sem imagem mostra "+ Foto". Por enquanto não há controle de permissão: qualquer usuário pode alterar. Também dá para manter as imagens direto no banco (veja [Manutenção das imagens](#manutenção-das-imagens)).
+- **Até duas imagens por material**, guardadas no banco: a **principal** aparece em miniatura na tabela (com o selo "2" quando há a segunda) e as duas são ampliadas ao clicar. No modal, um seletor alterna entre "Principal" e "Foto 2"; para cada uma dá para **tirar a foto com a câmera** ou **enviar um arquivo** (com prévia antes de salvar), remover, e **tornar a segunda a principal**. Material sem imagem mostra "+ Foto". Por enquanto não há controle de permissão: qualquer usuário pode alterar. Também dá para manter as imagens direto no banco (veja [Manutenção das imagens](#manutenção-das-imagens)).
 - Etiqueta em PDF (padrão 100 × 50 mm, configurável) com os dados do material e o QR Code.
 - Botão **Escanear QR Code**: lê o QR da etiqueta pela câmera (celular ou notebook) ou pelo campo de código e mostra o material, com atalhos para imprimir a etiqueta e filtrar a lista. A entrada e a saída de estoque (Fase 2) ainda não estão disponíveis.
 
@@ -21,16 +21,17 @@ A `ESMATERI` do ERP é acessada **só para leitura**: o usuário da aplicação 
 
 ### Como as imagens são guardadas
 
-- Ficam **no Oracle, em BLOB**, nunca em arquivo no servidor.
+- Ficam **no Oracle, em BLOB**, nunca em arquivo no servidor: uma linha por imagem, com `POSICAO` 1 (principal) ou 2. A PK é `(CD_MATERIAL, POSICAO)`.
+- Regra: **a 2 só existe se houver a 1**. Enviar a 2 sem ter a principal grava como principal; remover a principal promove a 2; "Tornar principal" troca as duas num único `UPDATE`.
 - Câmera: no celular abre o app de câmera do aparelho; no computador abre o vídeo ao vivo no próprio modal (só em HTTPS ou `localhost`). Fotos grandes são reduzidas no navegador (até 2048 px) antes do envio.
 - Pela tela ou pelo script de manutenção, qualquer arquivo (JPG, PNG, WebP ou GIF, até 10 MB) vira **WebP** em duas versões:
   - **imagem**: até 1024 px, ~5–100 KB;
   - **miniatura**: até 160 px, ~1 KB.
 
   A rotação das fotos de celular (EXIF) é corrigida e os metadados (GPS, câmera) são descartados. No teste, uma foto de 1,2 MB virou 95 KB no banco.
-- A miniatura fica guardada *dentro* da linha da tabela e a imagem grande fica fora dela (SECUREFILE). A listagem só lê o `HASH` (LEFT JOIN), nunca o BLOB.
+- A miniatura fica guardada *dentro* da linha da tabela e a imagem grande fica fora dela (SECUREFILE). A listagem só lê o `HASH` das duas posições (um LEFT JOIN por posição, então continua uma linha por material), nunca o BLOB. A API devolve `IMAGEM_HASH`/`IMAGEM_FICTICIA` (principal) e `IMAGEM2_HASH`/`IMAGEM2_FICTICIA`.
 - As imagens são servidas com `ETag` e `Cache-Control: immutable`, usando o `HASH` na URL. O trigger `TRG_MATERIAL_IMAGEM_VERSAO` gera um `HASH` novo a cada inclusão ou alteração, inclusive as feitas à mão por SQL. Assim o navegador nunca fica preso numa imagem antiga.
-- O export do cliente não tem fotos. Por isso `scripts/gerar-imagens-ficticias.php` desenha **ilustrações** por tipo de material (parafuso, porca, tubo, perfil, chapa, motorredutor, elevador...). Elas são marcadas com o selo "Imagem ilustrativa" e com `FICTICIA = 'S'`.
+- O export do cliente não tem fotos. Por isso `scripts/gerar-imagens-ficticias.php` desenha **ilustrações** por tipo de material (parafuso, porca, tubo, perfil, chapa, motorredutor, elevador...). Elas são marcadas com o selo "Imagem ilustrativa" e com `FICTICIA = 'S'`, e só ocupam a imagem principal.
 
 ---
 
@@ -85,7 +86,8 @@ projeto-erp/
 │       └── sql/
 │           ├── 02-ddl-esmateri.sql  # estrutura da tabela ESMATERI
 │           ├── 03-mocks.sql         # 22 materiais fictícios para teste
-│           └── 04-material-imagem.sql # tabela das imagens (do módulo)
+│           ├── 04-material-imagem.sql # tabela das imagens (do módulo)
+│           └── migracoes/           # ajustes para bancos já existentes
 ├── public/
 │   ├── index.php                    # ponto de entrada e rotas
 │   └── assets/                      # CSS e JS da tela (scanner.js = leitor de QR)
@@ -131,9 +133,10 @@ O Compose sobe três containers na mesma rede:
 | GET | `/materiais` | Tela de consulta (`/` redireciona para cá) |
 | GET | `/api/materiais` | Lista materiais com filtros e paginação |
 | GET | `/api/materiais/{cd}` | Detalhe de um material |
-| GET | `/api/materiais/{cd}/imagem` | Imagem do material (`?tam=mini\|grande`, `&v={hash}` para cache longo) |
-| POST | `/api/materiais/{cd}/imagem` | Inclui ou troca a imagem (multipart, campo `imagem`, até 10 MB) |
-| DELETE | `/api/materiais/{cd}/imagem` | Remove a imagem |
+| GET | `/api/materiais/{cd}/imagem[/{pos}]` | Imagem 1 (principal) ou 2; sem `/{pos}` vale a 1 (`?tam=mini\|grande`, `&v={hash}` para cache longo) |
+| POST | `/api/materiais/{cd}/imagem[/{pos}]` | Inclui ou troca a imagem (multipart, campo `imagem`, até 10 MB). Responde com o material |
+| DELETE | `/api/materiais/{cd}/imagem[/{pos}]` | Remove a imagem (remover a 1 promove a 2). Responde com o material |
+| POST | `/api/materiais/{cd}/imagem/inverter` | Troca a 1 com a 2 (`409` se não houver as duas) |
 | GET | `/api/grupos` | Lista de grupos |
 | GET | `/api/grupos/{grupo}/subgrupos` | Subgrupos de um grupo |
 | GET | `/etiquetas/{cd}` | Etiqueta em PDF (`?formato=html` para pré-visualizar) |
@@ -244,26 +247,32 @@ O jeito normal é pela tela (câmera ou arquivo). Também dá para incluir, troc
 Coloque o arquivo dentro do projeto (por exemplo, em `var/`) e rode:
 
 ```bash
-# incluir ou trocar
+# incluir ou trocar a principal
 docker compose exec php php scripts/imagem-material.php importar 2000100039 var/foto.jpg
 
-# remover
+# incluir ou trocar a segunda imagem (posição 2)
+docker compose exec php php scripts/imagem-material.php importar 2000100039 var/foto2.jpg 2
+
+# remover (sem posição = principal; a 2, se houver, vira a principal)
 docker compose exec php php scripts/imagem-material.php remover 2000100039
+docker compose exec php php scripts/imagem-material.php remover 2000100039 2
 ```
 
 O script confere se o material existe na `ESMATERI` e se o arquivo é mesmo uma imagem. Depois converte para WebP, gera a miniatura e grava.
 
 ### Direto por SQL (DBeaver, SQL Developer)
 
-Basta preencher `CD_MATERIAL` e `IMAGEM`, carregando o arquivo JPG, PNG, WebP ou GIF no campo BLOB. O resto é automático:
+Basta preencher `CD_MATERIAL` e `IMAGEM`, carregando o arquivo JPG, PNG, WebP ou GIF no campo BLOB. `POSICAO` vale 1 (principal) se ficar vazia; use 2 para a segunda imagem, só se o material já tiver a 1. O resto é automático:
 
 - `MINIATURA` é opcional. Sem ela, a tela usa a própria `IMAGEM` reduzida pelo navegador. Funciona, mas a página fica mais pesada se a imagem for grande.
 - `HASH`, `BYTES_IMAGEM`, `BYTES_MINIATURA` e `DT_ATUALIZACAO` são preenchidos pelo trigger.
 - O tipo do arquivo é detectado pelo conteúdo, então a coluna `MIME` pode ficar vazia.
 
 ```sql
--- remover
+-- remover as duas
 DELETE FROM MATERIAL_IMAGEM WHERE CD_MATERIAL = '2000100039';
+-- remover só a segunda
+DELETE FROM MATERIAL_IMAGEM WHERE CD_MATERIAL = '2000100039' AND POSICAO = 2;
 COMMIT;
 ```
 
@@ -285,6 +294,14 @@ Por esse caminho a imagem vai **sem otimização**. Prefira arquivos já pequeno
   EOF'
   ```
   Depois de mudar o `Dockerfile` ou o `php.ini`, rode `docker compose build php` (o suporte a WebP e EXIF depende disso).
-- **Produção (AWS):** o usuário da aplicação precisa de cota num tablespace e da tabela `MATERIAL_IMAGEM` criada no schema dele (`04-material-imagem.sql`). A `ESMATERI` continua só com `SELECT`. A aplicação web não grava nada: quem altera imagens é o script de manutenção ou o SQL.
+- **Banco criado antes das duas imagens:** a tabela já existe sem `POSICAO`. Rode a migração (as imagens atuais viram a principal):
+  ```bash
+  docker compose exec -T oracle bash -c 'sqlplus -s / as sysdba <<EOF
+  ALTER SESSION SET CONTAINER = ${DB_SERVICE};
+  ALTER SESSION SET CURRENT_SCHEMA = ${DB_USER};
+  @/opt/erp-sql/migracoes/2026-11-24-duas-imagens.sql
+  EOF'
+  ```
+- **Produção (AWS):** o usuário da aplicação precisa de cota num tablespace e da tabela `MATERIAL_IMAGEM` criada no schema dele (`04-material-imagem.sql`; se ela já tiver sido criada antes das duas imagens, rode também a migração acima). A `ESMATERI` continua só com `SELECT`. A aplicação web não grava nada: quem altera imagens é o script de manutenção ou o SQL.
 - **HTTPS em produção:** o certificado autoassinado é só para desenvolvimento. Na AWS o HTTPS deve vir de um certificado válido (no balanceador ou no nginx).
 - **Configuração:** dentro do Docker, o PHP recebe as configurações pelo ambiente, definidas no `docker-compose.yml`, e não lendo o `.env`. A senha do SYSTEM (`ORACLE_PASSWORD`) não é repassada à aplicação.

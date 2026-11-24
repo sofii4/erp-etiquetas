@@ -1,7 +1,9 @@
 <?php
 /**
- * Imagem do material: ampliar, tirar foto (câmera), enviar arquivo ou remover.
- * Comportamento em public/assets/js/materiais.js.
+ * Imagens do material (até duas): ampliar, tirar foto (câmera), enviar
+ * arquivo, remover ou tornar principal. As ações valem para a imagem
+ * escolhida no seletor (data-fotos). Comportamento em
+ * public/assets/js/materiais.js.
  *
  * Estados (data-modo no <dialog>): ver | camera | previa.
  */
@@ -27,6 +29,12 @@
             <span data-selo-previa class="selo-previa hidden">Prévia · ainda não salva</span>
         </div>
 
+        <!-- Seletor: imagem 1 (principal, aparece na tabela) e imagem 2. Preenchido pelo JS. -->
+        <div data-fotos class="flex gap-2" role="group" aria-label="Imagens do material">
+            <button type="button" data-foto="1" class="foto-slot"></button>
+            <button type="button" data-foto="2" class="foto-slot"></button>
+        </div>
+
         <p data-msg role="alert" class="hidden rounded-xl border px-3 py-2 text-sm"></p>
 
         <!-- ver: ações sobre a imagem atual -->
@@ -39,6 +47,7 @@
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
                 Enviar arquivo
             </button>
+            <button type="button" data-principal class="btn-img hidden">Tornar principal</button>
             <button type="button" data-remover class="btn-img btn-img-perigo sm:ml-auto">Remover imagem</button>
         </div>
 

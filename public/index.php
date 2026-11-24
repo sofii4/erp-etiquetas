@@ -63,11 +63,13 @@ $app->get('/materiais', [$material, 'index']);
 // API — usada pela tela de materiais e pelo leitor de QR (scanner.js).
 $app->get('/api/materiais', [$material, 'listar']);
 $app->get('/api/materiais/{cd}', [$material, 'detalhe']);
-// Imagem do material (gravada no banco, em WebP). A tela envia pela câmera
-// ou por arquivo. Sem controle de permissão por enquanto.
-$app->get('/api/materiais/{cd}/imagem', [$imagem, 'mostrar']);
-$app->post('/api/materiais/{cd}/imagem', [$imagem, 'salvar']);
-$app->delete('/api/materiais/{cd}/imagem', [$imagem, 'remover']);
+// Imagens do material (até duas, gravadas no banco em WebP). /{pos} é 1
+// (principal) ou 2; sem ele, vale a 1. A tela envia pela câmera ou por
+// arquivo. Sem controle de permissão por enquanto.
+$app->post('/api/materiais/{cd}/imagem/inverter', [$imagem, 'inverter']);
+$app->get('/api/materiais/{cd}/imagem[/{pos:[12]}]', [$imagem, 'mostrar']);
+$app->post('/api/materiais/{cd}/imagem[/{pos:[12]}]', [$imagem, 'salvar']);
+$app->delete('/api/materiais/{cd}/imagem[/{pos:[12]}]', [$imagem, 'remover']);
 $app->get('/api/grupos', [$material, 'grupos']);
 $app->get('/api/grupos/{grupo}/subgrupos', [$material, 'subgrupos']);
 

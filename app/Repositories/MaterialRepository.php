@@ -14,16 +14,18 @@ use InvalidArgumentException;
  *  - nada de recursos 21c/23ai (BOOLEAN em SQL, IF EXISTS, SELECT sem FROM DUAL...);
  *  - só as colunas usadas — a tabela tem 106.
  *
- * A ESMATERI só é LIDA. A imagem vem de MATERIAL_IMAGEM (LEFT JOIN).
+ * A ESMATERI só é LIDA. As imagens (até duas) vêm de MATERIAL_IMAGEM (LEFT JOIN).
  *
  * O ERP grava "vazio" como ' ' nas colunas VARCHAR2 NOT NULL; TRIM(' ') no
  * Oracle vira NULL, então a API devolve null nesses casos.
  */
 final class MaterialRepository
 {
-    // "m." = ESMATERI; "i." = MATERIAL_IMAGEM (tabela própria do módulo, no
-    // schema da aplicação). Do lado da imagem só vem o HASH: o BLOB é baixado
-    // à parte, pela URL /api/materiais/{cd}/imagem?v={hash}.
+    // "m." = ESMATERI; "i." e "i2." = imagens 1 (principal) e 2 da
+    // MATERIAL_IMAGEM (tabela própria do módulo, no schema da aplicação). Um
+    // JOIN por posição mantém uma linha por material. Do lado da imagem só
+    // vem o HASH: o BLOB é baixado à parte, pela URL
+    // /api/materiais/{cd}/imagem/{pos}?v={hash}.
     private const COLUNAS = <<<'SQL'
         TRIM(m.CD_MATERIAL)     AS CD_MATERIAL,
         TRIM(m.DESCRICAO)       AS DESCRICAO,
@@ -36,10 +38,13 @@ final class MaterialRepository
         TRIM(m.USUARIO_CRIACAO) AS USUARIO_CRIACAO,
         TRIM(m.USUARIO_MODIFIC) AS USUARIO_MODIFIC,
         i.HASH                  AS IMAGEM_HASH,
-        i.FICTICIA              AS IMAGEM_FICTICIA
+        i.FICTICIA              AS IMAGEM_FICTICIA,
+        i2.HASH                 AS IMAGEM2_HASH,
+        i2.FICTICIA             AS IMAGEM2_FICTICIA
         SQL;
 
-    private const JOIN_IMAGEM = 'LEFT JOIN MATERIAL_IMAGEM i ON i.CD_MATERIAL = m.CD_MATERIAL';
+    private const JOIN_IMAGEM = 'LEFT JOIN MATERIAL_IMAGEM i  ON i.CD_MATERIAL  = m.CD_MATERIAL AND i.POSICAO  = 1 '
+                              . 'LEFT JOIN MATERIAL_IMAGEM i2 ON i2.CD_MATERIAL = m.CD_MATERIAL AND i2.POSICAO = 2';
 
     public const POR_PAGINA_MAX = 100;
 

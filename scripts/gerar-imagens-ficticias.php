@@ -3,8 +3,9 @@ declare(strict_types=1);
 
 /**
  * Gera imagens ILUSTRATIVAS para os materiais que ainda não têm imagem e
- * grava no banco (MATERIAL_IMAGEM, FICTICIA = 'S'), passando pelo mesmo
- * ImagemService do upload (WebP + miniatura).
+ * grava no banco como imagem 1/principal (MATERIAL_IMAGEM, FICTICIA = 'S'),
+ * passando pelo mesmo ImagemService do upload (WebP + miniatura). A
+ * imagem 2 nunca é mexida.
  *
  * O export do cliente não traz fotos: as ilustrações servem para testar o
  * layout e a performance da tabela. Cada uma leva o selo "IMAGEM
