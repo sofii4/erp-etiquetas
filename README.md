@@ -337,6 +337,8 @@ Itens a confirmar com o cliente antes da produção:
 
 ---
 
+## Observações
+
 - **Banco já existente (criado antes das imagens):** os scripts de init só rodam no primeiro boot. Para criar a tabela de imagens sem apagar o banco, rode:
   ```bash
   docker compose exec -T oracle bash -c 'sqlplus -s / as sysdba <<EOF
