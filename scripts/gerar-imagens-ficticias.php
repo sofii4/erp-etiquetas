@@ -8,9 +8,9 @@ declare(strict_types=1);
  * imagem 2 nunca é mexida.
  *
  * O export do cliente não traz fotos: as ilustrações servem para testar o
- * layout e a performance da tabela. Cada uma leva o selo "IMAGEM
- * ILUSTRATIVA" e é desenhada a partir de palavras da DESCRICAO (parafuso,
- * porca, tubo, perfil, chapa, motorredutor, elevador...).
+ * layout e a performance da tabela. Cada uma é desenhada a partir de
+ * palavras da DESCRICAO (parafuso, porca, tubo, perfil, chapa,
+ * motorredutor, elevador...), sem selo.
  *
  * Uso (dentro do container):
  *   docker compose exec php php scripts/gerar-imagens-ficticias.php
@@ -172,8 +172,6 @@ final class Ilustrador
             default    => $this->peca($tinta),
         };
 
-        $this->selo();
-
         $saida = imagecreatetruecolor(self::SAIDA, self::SAIDA);
         imagecopyresampled($saida, $this->im, 0, 0, 0, 0, self::SAIDA, self::SAIDA, self::S, self::S);
         ob_start();
@@ -199,17 +197,6 @@ final class Ilustrador
             imagefilledellipse($this->im, $cx, $cy, (int) ($w * (0.4 + 0.6 * $f)), (int) ($h * (0.4 + 0.6 * $f)),
                 imagecolorallocatealpha($this->im, 20, 30, 45, 122));
         }
-    }
-
-    private function selo(): void
-    {
-        $txt = 'IMAGEM ILUSTRATIVA';
-        $box = imagettfbbox(30, 0, $this->fonte, $txt);
-        $w = $box[2] - $box[0];
-        $x = self::S - $w - 70;
-        $y = self::S - 60;
-        imagefilledrectangle($this->im, $x - 24, $y - 52, $x + $w + 24, $y + 18, imagecolorallocatealpha($this->im, 255, 255, 255, 40));
-        imagettftext($this->im, 30, 0, $x, $y, $this->cor([120, 128, 140]), $this->fonte, $txt);
     }
 
     // ── Primitivas ──────────────────────────────

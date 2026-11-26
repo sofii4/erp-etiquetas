@@ -25,7 +25,6 @@
             <img data-imagem alt="" decoding="async">
             <video data-video class="hidden" muted playsinline aria-label="Imagem da câmera"></video>
             <p data-sem-foto class="hidden text-sm font-bold uppercase tracking-widest text-gray-500">Sem foto</p>
-            <span data-ficticia class="selo-ficticia hidden">Imagem ilustrativa</span>
             <span data-selo-previa class="selo-previa hidden">Prévia · ainda não salva</span>
         </div>
 

@@ -49,7 +49,10 @@
     const descricaoComDestaque = (texto, termo) => {
         const frag = document.createDocumentFragment();
         if (!texto) return frag.appendChild(document.createTextNode('—')), frag;
-        const i = termo ? texto.toLocaleUpperCase('pt-BR').indexOf(termo.toLocaleUpperCase('pt-BR')) : -1;
+        // Igual à busca no banco: sem acento e sem maiúscula. Tira o acento
+        // letra a letra, para o índice continuar valendo no texto original.
+        const base = (s) => [...s.toLocaleUpperCase('pt-BR')].map((c) => c.normalize('NFD')[0]).join('');
+        const i = termo ? base(texto).indexOf(base(termo)) : -1;
         if (i < 0) {
             frag.appendChild(document.createTextNode(texto));
         } else {
@@ -110,10 +113,8 @@
     const urlImagem = (cd, pos, hash, tam) =>
         `/api/materiais/${encodeURIComponent(cd)}/imagem/${pos}?tam=${tam}&v=${encodeURIComponent(hash)}`;
 
-    /** Hash e "fictícia?" da imagem 1 ou 2 do material. */
-    const foto = (m, pos) => pos === 2
-        ? { hash: m?.IMAGEM2_HASH ?? null, ficticia: m?.IMAGEM2_FICTICIA === 'S' }
-        : { hash: m?.IMAGEM_HASH ?? null, ficticia: m?.IMAGEM_FICTICIA === 'S' };
+    /** Hash da imagem 1 ou 2 do material. */
+    const foto = (m, pos) => ({ hash: (pos === 2 ? m?.IMAGEM2_HASH : m?.IMAGEM_HASH) ?? null });
 
     const CAMPOS_IMAGEM = ['IMAGEM_HASH', 'IMAGEM_FICTICIA', 'IMAGEM2_HASH', 'IMAGEM2_FICTICIA'];
 
@@ -132,8 +133,7 @@
             return botao;
         }
         const duas = Boolean(m.IMAGEM2_HASH);
-        botao.title = (m.IMAGEM_FICTICIA === 'S' ? 'Imagem ilustrativa · ' : '')
-            + (duas ? '2 imagens · ' : '') + 'clique para ampliar ou trocar';
+        botao.title = (duas ? '2 imagens · ' : '') + 'clique para ampliar ou trocar';
         botao.setAttribute('aria-label', `Ampliar ${duas ? 'imagens' : 'imagem'} de ${m.DESCRICAO ?? m.CD_MATERIAL}`);
         const img = el('img');
         img.src = urlImagem(m.CD_MATERIAL, 1, m.IMAGEM_HASH, 'mini');
@@ -367,7 +367,6 @@
         const f = foto(m, posAtual);
         mVideo.classList.toggle('hidden', novo !== 'camera');
         $m('[data-selo-previa]').classList.toggle('hidden', novo !== 'previa');
-        $m('[data-ficticia]').classList.toggle('hidden', !(novo === 'ver' && f.hash && f.ficticia));
         desenharSlots();
 
         if (novo === 'previa') {

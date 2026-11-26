@@ -31,7 +31,7 @@ A `ESMATERI` e a `GRUPO_SUBGRUPO` (nomes dos grupos e subgrupos, export do ERP) 
   A rotação das fotos de celular (EXIF) é corrigida e os metadados (GPS, câmera) são descartados. No teste, uma foto de 1,2 MB virou 95 KB no banco.
 - A miniatura fica guardada *dentro* da linha da tabela e a imagem grande fica fora dela (SECUREFILE). A listagem só lê o `HASH` das duas posições (um LEFT JOIN por posição, então continua uma linha por material), nunca o BLOB. A API devolve `IMAGEM_HASH`/`IMAGEM_FICTICIA` (principal) e `IMAGEM2_HASH`/`IMAGEM2_FICTICIA`.
 - As imagens são servidas com `ETag` e `Cache-Control: immutable`, usando o `HASH` na URL. O trigger `TRG_MATERIAL_IMAGEM_VERSAO` gera um `HASH` novo a cada inclusão ou alteração, inclusive as feitas à mão por SQL. Assim o navegador nunca fica preso numa imagem antiga.
-- O export do cliente não tem fotos. Por isso `scripts/gerar-imagens-ficticias.php` desenha **ilustrações** por tipo de material (parafuso, porca, tubo, perfil, chapa, motorredutor, elevador...). Elas são marcadas com o selo "Imagem ilustrativa" e com `FICTICIA = 'S'`, e só ocupam a imagem principal.
+- O export do cliente não tem fotos. Por isso `scripts/gerar-imagens-ficticias.php` desenha **ilustrações** por tipo de material (parafuso, porca, tubo, perfil, chapa, motorredutor, elevador...). Elas não levam selo na tela, mas ficam marcadas no banco com `FICTICIA = 'S'` (assim nunca sobrescrevem uma foto real) e só ocupam a imagem principal.
 
 ---
 

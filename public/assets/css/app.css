@@ -147,19 +147,6 @@ dialog[open] { animation: aparecer .15s ease-out; }
     overflow: hidden;
 }
 .imagem-palco img { width: 100%; height: 100%; object-fit: contain; }
-.selo-ficticia {
-    position: absolute;
-    top: 0.75rem;
-    left: 0.75rem;
-    padding: 0.2rem 0.6rem;
-    border-radius: 999px;
-    background: rgb(3 7 18 / .75);
-    color: #fcd34d;
-    font-size: 0.625rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-}
 .miniatura.vazia:hover { border-color: #60a5fa; color: #93c5fd; }
 
 /* Selo "2" na miniatura: o material tem a segunda imagem. */
