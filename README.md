@@ -4,11 +4,11 @@ Módulo que complementa o ERP: consulta os materiais da tabela `ESMATERI` (Oracl
 
 **Banco de dados em uso:** Oracle Database **XE 21c** (Express Edition, gratuito), rodando em Docker com a imagem `gvenzl/oracle-xe:21-slim-faststart`. É o banco de **desenvolvimento e testes**.
 
-> ⚠️ **Antes de colocar em produção: migrar para o Oracle 19c.** O 19c é a versão exigida para produção (é a do ERP na AWS). O código já foi escrito usando só recursos que existem no 19c, mas a validação nele ainda não foi feita. Veja [Migração para o Oracle 19c](#migração-para-o-oracle-19c-antes-da-produção).
+> ⚠️ **Antes de colocar em produção: migrar para o Oracle 19c.** O código já foi escrito usando só recursos que existem no 19c, mas a validação nele ainda não foi feita. Veja [Migração para o Oracle 19c](#migração-para-o-oracle-19c-antes-da-produção).
 
-**Dados atuais:** export real do ERP com **5.000 materiais** e a tabela de **grupos/subgrupos** (11 grupos, 251 subgrupos). Os CSVs ficam fora do git (dados do cliente). Sem eles, o sistema sobe com 22 materiais fictícios (veja o [passo 3](#3-carregar-os-materiais-reais-do-cliente)).
+**Dados atuais:** export real do ERP com **5.000 materiais** e a tabela de **grupos/subgrupos** (11 grupos, 251 subgrupos). Os CSVs ficam fora do git (dados do cliente). Sem eles, o sistema sobe com 22 materiais fictícios ([passo 3](#3-carregar-os-materiais-reais-do-cliente)).
 
-**O que já funciona (Fase 1)**
+**O que já funciona**
 
 - Tela de consulta de materiais, com filtros por código, descrição (sem diferenciar acento: "balanca" acha "BALANÇA") e grupo/subgrupo, e com paginação. Grupos e subgrupos aparecem com o nome ("30 · EQUIPAMENTOS PADRAO"), vindo da tabela `GRUPO_SUBGRUPO`; o filtro só mostra os que têm material.
 - **Até duas imagens por material**, guardadas no banco: a **principal** aparece em miniatura na tabela (com o selo "2" quando há a segunda) e as duas são ampliadas ao clicar. No modal, um seletor alterna entre "Principal" e "Foto 2"; para cada uma dá para **tirar a foto com a câmera** ou **enviar um arquivo** (com prévia antes de salvar), remover, e **tornar a segunda a principal**. Material sem imagem mostra "+ Foto". Por enquanto não há controle de permissão: qualquer usuário pode alterar. Também dá para manter as imagens direto no banco (veja [Manutenção das imagens](#manutenção-das-imagens)).
@@ -47,7 +47,7 @@ A `ESMATERI` e a `GRUPO_SUBGRUPO` (nomes dos grupos e subgrupos, export do ERP) 
 |---|---|
 | Linguagem | PHP 8.3 (PHP-FPM, imagem Debian) |
 | Framework | [Slim 4](https://www.slimframework.com/) + slim/psr7 |
-| Banco de dados | Oracle **XE 21c** em desenvolvimento (atual) → **19c** em produção (AWS, exigido) |
+| Banco de dados | Oracle **XE 21c** em desenvolvimento (atual) → **19c** em produção |
 | Driver do banco | OCI8 + Oracle Instant Client |
 | QR Code | [endroid/qr-code](https://github.com/endroid/qr-code) |
 | PDF da etiqueta | [dompdf](https://github.com/dompdf/dompdf) |
@@ -117,7 +117,7 @@ projeto-erp/
 └── composer.json
 ```
 
-### Como as peças se conectam
+### Fluxo da Arquitetura
 
 ```
 Navegador ──► nginx (8190 http / 8191 https) ──► PHP-FPM (Slim) ──► Oracle (ESMATERI + GRUPO_SUBGRUPO + MATERIAL_IMAGEM)
@@ -186,18 +186,10 @@ As outras variáveis já vêm prontas para o ambiente local. Para mudar o tamanh
 
 ### 3. Carregar os materiais reais do cliente
 
-Sem este passo, o banco é carregado com 22 materiais fictícios, sem nomes de grupos. Para usar o export real, coloque os dois CSVs em `var/` (pasta fora do git) e rode:
-
-```bash
-python3 scripts/csv-para-sql.py var/dataset_sofia.csv var/grupo_subgrupo_sofia.csv
-```
+Sem este passo, o banco é carregado com 22 materiais fictícios, sem nomes de grupos. Para usar o export real, coloque os dois CSVs em `var/`.
 
 - 1º arquivo: export da `ESMATERI` (cabeçalho com as 106 colunas, na ordem do DDL).
 - 2º arquivo (opcional): grupos e subgrupos, com as colunas `CD_GRUPO, DESC_GRUPO, CD_SUB_GRUPO, DESC_SUBGRUPO`.
-
-Saída esperada com os arquivos atuais: `5000 materiais`, `251 subgrupos` e alguns avisos (veja [Ajustes feitos nos dados](#ajustes-feitos-nos-dados-do-cliente)).
-
-Os CSVs podem vir em Latin-1 (padrão do export) ou UTF-8. Linhas com colunas a mais ou a menos que o cabeçalho entram só com os campos básicos (grupo, subgrupo, código, descrição, unidade), e descrições acima de 60 bytes são cortadas; o script avisa cada caso. Sem o CSV de grupos, a tela mostra só os códigos.
 
 O script gera `docker/oracle/sql/03-dados-cliente.sql`. Quando esse arquivo existe, ele é usado no lugar dos dados fictícios. Ele **fica fora do git** porque contém dados reais do cliente.
 
@@ -245,15 +237,6 @@ Se o Docker roda numa VM, troque `localhost` pelo IP da VM (`hostname -I` mostra
 | Câmera não abre no celular | Precisa ser pelo `https://<ip-da-vm>:8191`. Em `http://` o navegador bloqueia a câmera |
 | Aviso de certificado no navegador | Normal em desenvolvimento (certificado autoassinado). Aceite uma vez |
 
-### Comandos do dia a dia
-
-| Comando | O que faz |
-|---|---|
-| `./scripts/start.sh` | Sobe tudo |
-| `./scripts/stop.sh` | Para os containers (os dados do banco são mantidos) |
-| `./scripts/reset.sh` | **Apaga o banco local**. No próximo start ele é recriado do zero |
-| `docker compose logs -f` | Mostra os logs em tempo real |
-| `docker compose logs -f php` | Logs só da aplicação |
 
 ### Acessar o banco por fora (DBeaver, SQL Developer)
 
@@ -327,7 +310,7 @@ Outras características dos dados que aparecem na tela:
 
 ## Migração para o Oracle 19c (antes da produção)
 
-**Exigência:** a produção roda no Oracle **19c** (AWS). O XE 21c usado aqui é só para desenvolvimento. Antes de entregar, é preciso subir este mesmo projeto num 19c e repetir os testes.
+**Exigência:** a produção roda no Oracle **19c**. O XE 21c usado aqui é só para desenvolvimento. Antes de entregar, é preciso subir este mesmo projeto num 19c e repetir os testes.
 
 O que já está pronto para isso:
 
@@ -354,9 +337,6 @@ Itens a confirmar com o cliente antes da produção:
 
 ---
 
-## Observações
-
-- **Schema:** a tabela pertence ao schema `"db_tst"`, escrito em minúsculas e por isso sempre entre aspas no SQL. Na AWS o nome real pode ser outro: basta mudar `DB_SCHEMA` no `.env`.
 - **Banco já existente (criado antes das imagens):** os scripts de init só rodam no primeiro boot. Para criar a tabela de imagens sem apagar o banco, rode:
   ```bash
   docker compose exec -T oracle bash -c 'sqlplus -s / as sysdba <<EOF
@@ -375,6 +355,6 @@ Itens a confirmar com o cliente antes da produção:
   @/opt/erp-sql/migracoes/2026-11-24-duas-imagens.sql
   EOF'
   ```
-- **Produção (AWS):** o usuário da aplicação precisa de `SELECT` na `ESMATERI` e na tabela de grupos/subgrupos. Se no ERP ela tiver outro nome ou outras colunas, basta ajustar o `joinGrupo()`, o `listarGrupos()` e o `listarSubGrupos()` do `MaterialRepository`. Ele também precisa de cota num tablespace e da tabela `MATERIAL_IMAGEM` criada no schema dele (`04-material-imagem.sql`; se ela já tiver sido criada antes das duas imagens, rode também a migração acima). A `ESMATERI` continua só com `SELECT`. A única gravação da aplicação é na `MATERIAL_IMAGEM` (upload de fotos pela tela).
-- **HTTPS em produção:** o certificado autoassinado é só para desenvolvimento. Na AWS o HTTPS deve vir de um certificado válido (no balanceador ou no nginx).
+- **Produção:** o usuário da aplicação precisa de `SELECT` na `ESMATERI` e na tabela de grupos/subgrupos. Se no ERP ela tiver outro nome ou outras colunas, basta ajustar o `joinGrupo()`, o `listarGrupos()` e o `listarSubGrupos()` do `MaterialRepository`. Ele também precisa de cota num tablespace e da tabela `MATERIAL_IMAGEM` criada no schema dele (`04-material-imagem.sql`; se ela já tiver sido criada antes das duas imagens, rode também a migração acima). A `ESMATERI` continua só com `SELECT`. A única gravação da aplicação é na `MATERIAL_IMAGEM` (upload de fotos pela tela).
+- **HTTPS em produção:** o certificado autoassinado é só para desenvolvimento. No servidor real o HTTPS deve vir de um certificado válido (no balanceador ou no nginx).
 - **Configuração:** dentro do Docker, o PHP recebe as configurações pelo ambiente, definidas no `docker-compose.yml`, e não lendo o `.env`. A senha do SYSTEM (`ORACLE_PASSWORD`) não é repassada à aplicação.

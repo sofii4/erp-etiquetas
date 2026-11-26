@@ -6,7 +6,7 @@
 #   - "db_tst"      : dono da ESMATERI e da GRUPO_SUBGRUPO, como no ERP. Schema-only (sem senha,
 #                     ninguém faz login com ele).
 #   - ${DB_USER}    : usuário da aplicação. Só tem SELECT na ESMATERI
-#                     (espelha o usuário read-only pedido para a AWS) e é
+#                     (espelha o usuário read-only pedido) e é
 #                     dono da tabela própria MATERIAL_IMAGEM (04-*.sql).
 #
 # Os SQLs de docker/oracle/sql/ não têm nome de schema nem de PDB, então
