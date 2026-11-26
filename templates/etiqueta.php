@@ -16,6 +16,8 @@ $qrMm    = $alturaU - 2;                          // QR quadrado, ocupando a alt
 $colQr   = $qrMm + 2.5;                           // coluna do QR + respiro até o texto
 $colInfo = $util - $colQr;
 $grupo   = trim(($material['CD_GRUPO'] ?? '') . ' / ' . ($material['CD_SUB_GRUPO'] ?? ''), ' /');
+// Nome do subgrupo (ou do grupo, se o subgrupo não está no catálogo).
+$nomeGrupo = $material['DESC_SUBGRUPO'] ?? $material['DESC_GRUPO'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -54,6 +56,7 @@ $grupo   = trim(($material['CD_GRUPO'] ?? '') . ' / ' . ($material['CD_SUB_GRUPO
     table.meta td.rotulo { width: 12mm; color: #444; }
     table.meta td.valor  { font-weight: bold; }
     .local { font-size: 10pt; }
+    .nome-grupo { display: block; font-size: 6pt; font-weight: normal; line-height: 1.1; }
 
     /* Só na pré-visualização no navegador (o PDF usa media "print") */
     @media screen {
@@ -84,7 +87,10 @@ $grupo   = trim(($material['CD_GRUPO'] ?? '') . ' / ' . ($material['CD_SUB_GRUPO
                     </tr>
                     <tr>
                         <td class="rotulo">Grupo</td>
-                        <td class="valor"><?= e($grupo !== '' ? $grupo : '—') ?></td>
+                        <td class="valor">
+                            <?= e($grupo !== '' ? $grupo : '—') ?>
+                            <?php if ($nomeGrupo !== ''): ?><span class="nome-grupo"><?= e($nomeGrupo) ?></span><?php endif; ?>
+                        </td>
                     </tr>
                 </table>
             </td>
