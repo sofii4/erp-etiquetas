@@ -2,6 +2,12 @@
 
 Módulo que complementa o ERP: consulta os materiais da tabela `ESMATERI` (Oracle) e gera etiquetas para imprimir, com um QR Code que guarda o código do material (`CD_MATERIAL`).
 
+**Banco de dados em uso:** Oracle Database **XE 21c** (Express Edition, gratuito), rodando em Docker com a imagem `gvenzl/oracle-xe:21-slim-faststart`. É o banco de **desenvolvimento e testes**.
+
+> ⚠️ **Antes de colocar em produção: migrar para o Oracle 19c.** O 19c é a versão exigida para produção (é a do ERP na AWS). O código já foi escrito usando só recursos que existem no 19c, mas a validação nele ainda não foi feita. Veja [Migração para o Oracle 19c](#migração-para-o-oracle-19c-antes-da-produção).
+
+**Dados atuais:** export real do ERP com **5.000 materiais** e a tabela de **grupos/subgrupos** (11 grupos, 251 subgrupos). Os CSVs ficam fora do git (dados do cliente). Sem eles, o sistema sobe com 22 materiais fictícios (veja o [passo 3](#3-carregar-os-materiais-reais-do-cliente)).
+
 **O que já funciona (Fase 1)**
 
 - Tela de consulta de materiais, com filtros por código, descrição (sem diferenciar acento: "balanca" acha "BALANÇA") e grupo/subgrupo, e com paginação. Grupos e subgrupos aparecem com o nome ("30 · EQUIPAMENTOS PADRAO"), vindo da tabela `GRUPO_SUBGRUPO`; o filtro só mostra os que têm material.
@@ -41,7 +47,7 @@ A `ESMATERI` e a `GRUPO_SUBGRUPO` (nomes dos grupos e subgrupos, export do ERP) 
 |---|---|
 | Linguagem | PHP 8.3 (PHP-FPM, imagem Debian) |
 | Framework | [Slim 4](https://www.slimframework.com/) + slim/psr7 |
-| Banco de dados | Oracle: **XE 21c** em desenvolvimento, **19c** em produção (AWS) |
+| Banco de dados | Oracle **XE 21c** em desenvolvimento (atual) → **19c** em produção (AWS, exigido) |
 | Driver do banco | OCI8 + Oracle Instant Client |
 | QR Code | [endroid/qr-code](https://github.com/endroid/qr-code) |
 | PDF da etiqueta | [dompdf](https://github.com/dompdf/dompdf) |
@@ -114,7 +120,7 @@ projeto-erp/
 ### Como as peças se conectam
 
 ```
-Navegador ──► nginx (8190 http / 8191 https) ──► PHP-FPM (Slim) ──► Oracle (ESMATERI + MATERIAL_IMAGEM)
+Navegador ──► nginx (8190 http / 8191 https) ──► PHP-FPM (Slim) ──► Oracle (ESMATERI + GRUPO_SUBGRUPO + MATERIAL_IMAGEM)
                                                     │
                                                     ├─ QrCodeService   → imagem do QR
                                                     ├─ EtiquetaService → PDF da etiqueta
@@ -154,6 +160,8 @@ O Compose sobe três containers na mesma rede:
 - Cerca de **10 GB livres** em disco: a imagem do Oracle XE tem ~6 GB e os dados ~3 GB.
 - Cerca de **3 GB de RAM** livres para o Oracle.
 - Não é preciso ter PHP nem Composer instalados na máquina. Tudo roda dentro dos containers.
+- **Python 3**, só para converter os CSVs do cliente (passo 3).
+- Portas livres no host: `8190` (site), `8191` (site com HTTPS) e `1521` (Oracle). Dá para trocar no `.env`.
 
 ### 1. Clonar o repositório
 
@@ -176,13 +184,18 @@ Edite o `.env` e troque pelo menos as senhas:
 
 As outras variáveis já vêm prontas para o ambiente local. Para mudar o tamanho da etiqueta, ajuste `ETIQUETA_LARGURA_MM` e `ETIQUETA_ALTURA_MM`. Para mudar a porta do site, ajuste `WEB_HOST_PORT`.
 
-### 3. (Opcional) Carregar os materiais reais do cliente
+### 3. Carregar os materiais reais do cliente
 
-Sem este passo, o banco é carregado com 22 materiais fictícios. Para usar o export real (CSV da `ESMATERI` e, opcional, o CSV de grupos/subgrupos com `CD_GRUPO, DESC_GRUPO, CD_SUB_GRUPO, DESC_SUBGRUPO`):
+Sem este passo, o banco é carregado com 22 materiais fictícios, sem nomes de grupos. Para usar o export real, coloque os dois CSVs em `var/` (pasta fora do git) e rode:
 
 ```bash
-python3 scripts/csv-para-sql.py var/materiais.csv var/grupos.csv
+python3 scripts/csv-para-sql.py var/dataset_sofia.csv var/grupo_subgrupo_sofia.csv
 ```
+
+- 1º arquivo: export da `ESMATERI` (cabeçalho com as 106 colunas, na ordem do DDL).
+- 2º arquivo (opcional): grupos e subgrupos, com as colunas `CD_GRUPO, DESC_GRUPO, CD_SUB_GRUPO, DESC_SUBGRUPO`.
+
+Saída esperada com os arquivos atuais: `5000 materiais`, `251 subgrupos` e alguns avisos (veja [Ajustes feitos nos dados](#ajustes-feitos-nos-dados-do-cliente)).
 
 Os CSVs podem vir em Latin-1 (padrão do export) ou UTF-8. Linhas com colunas a mais ou a menos que o cabeçalho entram só com os campos básicos (grupo, subgrupo, código, descrição, unidade), e descrições acima de 60 bytes são cortadas; o script avisa cada caso. Sem o CSV de grupos, a tela mostra só os códigos.
 
@@ -196,7 +209,7 @@ O script gera `docker/oracle/sql/03-dados-cliente.sql`. Quando esse arquivo exis
 ./scripts/start.sh
 ```
 
-Na primeira vez o script gera o certificado HTTPS local (`docker/nginx/certs`, fora do git). Depois monta a imagem do PHP, sobe os três containers e espera todos ficarem prontos. No primeiro boot o Oracle leva **cerca de 1 minuto** para criar o banco, os usuários e a tabela.
+Na primeira vez o script gera o certificado HTTPS local (`docker/nginx/certs`, fora do git). Depois monta a imagem do PHP, sobe os três containers e espera todos ficarem prontos. No primeiro boot o Oracle leva **cerca de 1 minuto** para criar o banco, os usuários e as tabelas e carregar os 5.000 materiais. Para conferir se a carga terminou: `docker compose logs oracle | grep ERP:` deve terminar em `ERP: setup concluído.`
 
 ### 5. Instalar as dependências PHP (só na primeira vez)
 
@@ -212,7 +225,7 @@ O `-u` faz a pasta `vendor/` ficar com o seu usuário, e não com o root.
 docker compose exec php php scripts/gerar-imagens-ficticias.php
 ```
 
-O script só preenche os materiais **sem** imagem. Com `--refazer`, ele regera as que já são fictícias. Imagens reais (`FICTICIA = 'N'`, gravadas pelo script de manutenção ou por SQL) nunca são sobrescritas. Com `--previa=var/previa`, ele só grava os PNGs na pasta, sem mexer no banco.
+Com os 5.000 materiais leva **cerca de 11 minutos** (a tela já funciona durante a geração; quem ainda não tem imagem mostra "+ Foto"). O script só preenche os materiais **sem** imagem. Com `--refazer`, ele regera as que já são fictícias. Imagens reais (`FICTICIA = 'N'`, gravadas pelo script de manutenção ou por SQL) nunca são sobrescritas. Com `--previa=var/previa`, ele só grava os PNGs na pasta, sem mexer no banco.
 
 ### 7. Acessar
 
@@ -220,7 +233,17 @@ O script só preenche os materiais **sem** imagem. Com `--refazer`, ele regera a
 - Com HTTPS (necessário para a câmera fora do `localhost`): <https://localhost:8191>
 - Teste rápido: <http://localhost:8190/health>
 
-Se o Docker roda numa VM, troque `localhost` pelo IP da VM. Se o IP da VM mudar, rode `./scripts/gerar-certificado.sh` e `docker compose restart nginx`.
+Se o Docker roda numa VM, troque `localhost` pelo IP da VM (`hostname -I` mostra o IP). Pelo celular, use o endereço HTTPS e aceite o aviso de certificado na primeira vez. Se o IP da VM mudar, rode `./scripts/gerar-certificado.sh` e `docker compose restart nginx`.
+
+### Problemas comuns
+
+| Sintoma | O que fazer |
+|---|---|
+| A tela abre, mas a busca dá erro de banco | O Oracle ainda está subindo. Espere `docker compose ps` mostrar `erp_oracle` como `healthy` e confira <http://localhost:8190/health> |
+| Continua com 22 materiais (fictícios) depois de gerar o SQL | Os dados só entram no primeiro boot do banco: rode `./scripts/reset.sh` (responda `yes`) e `./scripts/start.sh` |
+| "port is already allocated" ao subir | Outra aplicação usa a porta. Troque `WEB_HOST_PORT`, `WEB_HTTPS_PORT` ou `ORACLE_HOST_PORT` no `.env` |
+| Câmera não abre no celular | Precisa ser pelo `https://<ip-da-vm>:8191`. Em `http://` o navegador bloqueia a câmera |
+| Aviso de certificado no navegador | Normal em desenvolvimento (certificado autoassinado). Aceite uma vez |
 
 ### Comandos do dia a dia
 
@@ -237,7 +260,7 @@ Se o Docker roda numa VM, troque `localhost` pelo IP da VM. Se o IP da VM mudar,
 - Host: `localhost` (ou o IP da VM)
 - Porta: `1521` (variável `ORACLE_HOST_PORT`)
 - Service name: `XEPDB1`
-- Usuário: `ETIQUETAS_APP` com a senha de `DB_PASS`. Na `ESMATERI` ele só consegue ler. A `MATERIAL_IMAGEM` pertence a ele, então é por esse usuário que se alteram as imagens via SQL.
+- Usuário: `ETIQUETAS_APP` com a senha de `DB_PASS`. Na `ESMATERI` e na `GRUPO_SUBGRUPO` (schema `"db_tst"`) ele só consegue ler. A `MATERIAL_IMAGEM` pertence a ele, então é por esse usuário que se alteram as imagens via SQL.
 
 ---
 
@@ -283,10 +306,57 @@ Por esse caminho a imagem vai **sem otimização**. Prefira arquivos já pequeno
 
 ---
 
+## Ajustes feitos nos dados do cliente
+
+O `csv-para-sql.py` avisa cada caso abaixo ao rodar. Com o export atual:
+
+- **Codificação:** os CSVs vêm em Latin-1 (ISO-8859-1). O script aceita Latin-1 ou UTF-8 e grava UTF-8 (o XE é sempre AL32UTF8).
+- **8 materiais com colunas deslocadas** (108 colunas em vez de 106: cadastros de jan/2026 com códigos curtos, como `002820` e `002970`). Entram só com grupo, subgrupo, código, descrição e unidade; o resto fica com o valor "vazio" do ERP.
+- **2 descrições cortadas em 60 bytes** (`0106300104` e `3001900026`): com acento, passam do `VARCHAR2(60 BYTE)` em UTF-8. No ERP cabem porque lá cada letra acentuada ocupa 1 byte. Isso indica que o banco do cliente não é UTF-8 (a confirmar).
+- **Grupos 25 e 35 (EDGE)** não têm subgrupos na tabela de grupos: os materiais deles mostram o nome do grupo e só o código do subgrupo.
+- **Linha em branco** no início do CSV de grupos é ignorada.
+
+Outras características dos dados que aparecem na tela:
+
+- `LOCALIZACAO` está vazia em todos os materiais: a etiqueta e a lista mostram "—".
+- 11 materiais não têm descrição: aparecem como "—".
+- As descrições usam abreviações ("PARAF", "MONT."): a busca por "parafuso" não acha nada. Para esses casos, use o filtro de grupo/subgrupo.
+- O filtro só lista grupos e subgrupos com algum material (por exemplo, o grupo 50 Imobilizados não aparece).
+
+---
+
+## Migração para o Oracle 19c (antes da produção)
+
+**Exigência:** a produção roda no Oracle **19c** (AWS). O XE 21c usado aqui é só para desenvolvimento. Antes de entregar, é preciso subir este mesmo projeto num 19c e repetir os testes.
+
+O que já está pronto para isso:
+
+- Todo o SQL usa só recursos do 19c (nada de `BOOLEAN` em SQL, `IF EXISTS`, `SELECT` sem `FROM DUAL`...). A busca sem acento usa `TRANSLATE`, que existe em todas as versões.
+- Os scripts de `docker/oracle/sql/` não têm nome de schema nem de PDB, então rodam iguais no 19c.
+
+Passos para validar localmente com a imagem oficial da Oracle:
+
+1. Criar conta em <https://container-registry.oracle.com>, aceitar a licença de **Database → enterprise** e fazer `docker login container-registry.oracle.com`.
+2. No `docker-compose.yml`, no serviço `oracle`:
+   - `image: container-registry.oracle.com/database/enterprise:19.3.0.0`;
+   - senha em `ORACLE_PWD` (no lugar de `ORACLE_PASSWORD`);
+   - scripts de init montados em `/opt/oracle/scripts/setup` (no lugar de `/container-entrypoint-initdb.d`);
+   - dados em `/opt/oracle/oradata` (igual) e o `healthcheck` trocado pelo da imagem oficial.
+3. No `.env`: `DB_SERVICE=ORCLPDB1`.
+4. `./scripts/reset.sh` e `./scripts/start.sh`. O primeiro boot do 19c é bem mais lento (pode passar de 20 minutos) e a imagem tem uns 8 GB.
+5. Repetir o teste: filtros, busca com acento, etiqueta em PDF, leitor de QR e envio de foto.
+
+Itens a confirmar com o cliente antes da produção:
+
+- Charset do banco (`NLS_CHARACTERSET`). Pelas descrições, parece não ser UTF-8; se for `WE8MSWIN1252`, criar o 19c local com `ORACLE_CHARACTERSET=WE8MSWIN1252`.
+- Nome real do schema (`DB_SCHEMA`) e da tabela de grupos/subgrupos no ERP. Se ela tiver outro nome ou outras colunas, ajustar `joinGrupo()`, `listarGrupos()` e `listarSubGrupos()` no `MaterialRepository`.
+- Usuário da aplicação com `SELECT` na `ESMATERI` e na tabela de grupos, e cota num tablespace para a `MATERIAL_IMAGEM`.
+
+---
+
 ## Observações
 
 - **Schema:** a tabela pertence ao schema `"db_tst"`, escrito em minúsculas e por isso sempre entre aspas no SQL. Na AWS o nome real pode ser outro: basta mudar `DB_SCHEMA` no `.env`.
-- **Oracle 19c:** para validar na versão de produção, troque a imagem do serviço `oracle` no `docker-compose.yml` e o `DB_SERVICE` no `.env` (por exemplo, `ORCLPDB1`).
 - **Banco já existente (criado antes das imagens):** os scripts de init só rodam no primeiro boot. Para criar a tabela de imagens sem apagar o banco, rode:
   ```bash
   docker compose exec -T oracle bash -c 'sqlplus -s / as sysdba <<EOF
@@ -305,6 +375,6 @@ Por esse caminho a imagem vai **sem otimização**. Prefira arquivos já pequeno
   @/opt/erp-sql/migracoes/2026-11-24-duas-imagens.sql
   EOF'
   ```
-- **Produção (AWS):** o usuário da aplicação precisa de `SELECT` na `ESMATERI` e na tabela de grupos/subgrupos. Se no ERP ela tiver outro nome ou outras colunas, basta ajustar o `joinGrupo()`, o `listarGrupos()` e o `listarSubGrupos()` do `MaterialRepository`. Ele também precisa de cota num tablespace e da tabela `MATERIAL_IMAGEM` criada no schema dele (`04-material-imagem.sql`; se ela já tiver sido criada antes das duas imagens, rode também a migração acima). A `ESMATERI` continua só com `SELECT`. A aplicação web não grava nada: quem altera imagens é o script de manutenção ou o SQL.
+- **Produção (AWS):** o usuário da aplicação precisa de `SELECT` na `ESMATERI` e na tabela de grupos/subgrupos. Se no ERP ela tiver outro nome ou outras colunas, basta ajustar o `joinGrupo()`, o `listarGrupos()` e o `listarSubGrupos()` do `MaterialRepository`. Ele também precisa de cota num tablespace e da tabela `MATERIAL_IMAGEM` criada no schema dele (`04-material-imagem.sql`; se ela já tiver sido criada antes das duas imagens, rode também a migração acima). A `ESMATERI` continua só com `SELECT`. A única gravação da aplicação é na `MATERIAL_IMAGEM` (upload de fotos pela tela).
 - **HTTPS em produção:** o certificado autoassinado é só para desenvolvimento. Na AWS o HTTPS deve vir de um certificado válido (no balanceador ou no nginx).
 - **Configuração:** dentro do Docker, o PHP recebe as configurações pelo ambiente, definidas no `docker-compose.yml`, e não lendo o `.env`. A senha do SYSTEM (`ORACLE_PASSWORD`) não é repassada à aplicação.
