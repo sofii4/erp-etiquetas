@@ -144,7 +144,8 @@
     const preencherResultado = (m) => {
         $('[data-r-codigo]').textContent = m.CD_MATERIAL;
         $('[data-r-descricao]').textContent = m.DESCRICAO ?? '—';
-        $('[data-r-grupo]').textContent = `${m.CD_GRUPO ?? '—'} / ${m.CD_SUB_GRUPO ?? '—'}`;
+        $('[data-r-grupo]').textContent = `${m.CD_GRUPO ?? '—'} / ${m.CD_SUB_GRUPO ?? '—'}`
+            + (m.DESC_SUBGRUPO ?? m.DESC_GRUPO ? ` · ${m.DESC_SUBGRUPO ?? m.DESC_GRUPO}` : '');
         $('[data-r-unidade]').textContent = m.CD_UNIDADE_MEDI ?? '—';
         $('[data-r-local]').textContent = m.LOCALIZACAO ?? '—';
 

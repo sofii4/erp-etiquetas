@@ -14,7 +14,9 @@ use InvalidArgumentException;
  *  - nada de recursos 21c/23ai (BOOLEAN em SQL, IF EXISTS, SELECT sem FROM DUAL...);
  *  - só as colunas usadas — a tabela tem 106.
  *
- * A ESMATERI só é LIDA. As imagens (até duas) vêm de MATERIAL_IMAGEM (LEFT JOIN).
+ * A ESMATERI só é LIDA. As imagens (até duas) vêm de MATERIAL_IMAGEM e os
+ * nomes de grupo/subgrupo de GRUPO_SUBGRUPO (LEFT JOIN: sem cadastro, o nome
+ * vem null e a tela mostra só o código).
  *
  * O ERP grava "vazio" como ' ' nas colunas VARCHAR2 NOT NULL; TRIM(' ') no
  * Oracle vira NULL, então a API devolve null nesses casos.
@@ -31,6 +33,8 @@ final class MaterialRepository
         TRIM(m.DESCRICAO)       AS DESCRICAO,
         TRIM(m.CD_GRUPO)        AS CD_GRUPO,
         TRIM(m.CD_SUB_GRUPO)    AS CD_SUB_GRUPO,
+        TRIM(gg.DESC_GRUPO)     AS DESC_GRUPO,
+        TRIM(g.DESC_SUBGRUPO)   AS DESC_SUBGRUPO,
         TRIM(m.CD_UNIDADE_MEDI) AS CD_UNIDADE_MEDI,
         TRIM(m.LOCALIZACAO)     AS LOCALIZACAO,
         TO_CHAR(m.DT_CADASTRO,    'YYYY-MM-DD"T"HH24:MI:SS') AS DT_CADASTRO,
@@ -46,10 +50,25 @@ final class MaterialRepository
     private const JOIN_IMAGEM = 'LEFT JOIN MATERIAL_IMAGEM i  ON i.CD_MATERIAL  = m.CD_MATERIAL AND i.POSICAO  = 1 '
                               . 'LEFT JOIN MATERIAL_IMAGEM i2 ON i2.CD_MATERIAL = m.CD_MATERIAL AND i2.POSICAO = 2';
 
+    /**
+     * Nome do subgrupo ("g.", pela PK do par) e do grupo ("gg.", à parte: há
+     * material em subgrupo que não está no catálogo, mas o grupo está).
+     * Continua uma linha por material.
+     */
+    private function joinGrupo(): string
+    {
+        return "LEFT JOIN {$this->tabelaGrupos} g ON g.CD_GRUPO = m.CD_GRUPO AND g.CD_SUB_GRUPO = m.CD_SUB_GRUPO "
+             . "LEFT JOIN (SELECT CD_GRUPO, MAX(DESC_GRUPO) AS DESC_GRUPO FROM {$this->tabelaGrupos} GROUP BY CD_GRUPO) gg "
+             . 'ON gg.CD_GRUPO = m.CD_GRUPO';
+    }
+
     public const POR_PAGINA_MAX = 100;
 
     /** Nome da tabela já qualificado e entre aspas: "db_tst"."ESMATERI" */
     private readonly string $tabela;
+
+    /** "db_tst"."GRUPO_SUBGRUPO": nomes dos grupos e subgrupos */
+    private readonly string $tabelaGrupos;
 
     public function __construct(
         private readonly OracleConnection $db,
@@ -61,6 +80,7 @@ final class MaterialRepository
             throw new InvalidArgumentException('DB_SCHEMA inválido: ' . $schema);
         }
         $this->tabela = sprintf('"%s"."ESMATERI"', $schema);
+        $this->tabelaGrupos = sprintf('"%s"."GRUPO_SUBGRUPO"', $schema);
     }
 
     /**
@@ -82,7 +102,8 @@ final class MaterialRepository
         $dados = $total === 0 ? [] : $this->db->query(
             'SELECT ' . self::COLUNAS . "
                FROM {$this->tabela} m
-               " . self::JOIN_IMAGEM . "
+               " . self::JOIN_IMAGEM . '
+               ' . $this->joinGrupo() . "
                {$where}
               ORDER BY m.CD_MATERIAL
              OFFSET :pular ROWS FETCH NEXT :qtd ROWS ONLY",
@@ -96,33 +117,44 @@ final class MaterialRepository
     public function porCodigo(string $cdMaterial): ?array
     {
         return $this->db->queryOne(
-            'SELECT ' . self::COLUNAS . " FROM {$this->tabela} m " . self::JOIN_IMAGEM . ' WHERE m.CD_MATERIAL = :cd',
+            'SELECT ' . self::COLUNAS . " FROM {$this->tabela} m " . self::JOIN_IMAGEM . ' ' . $this->joinGrupo() . ' WHERE m.CD_MATERIAL = :cd',
             ['cd' => $cdMaterial]
         );
     }
 
-    /** @return list<string> */
+    /**
+     * Só os grupos que têm material, com o nome quando cadastrado.
+     *
+     * @return list<array{CD_GRUPO: string, DESCRICAO: string|null}>
+     */
     public function listarGrupos(): array
     {
-        $linhas = $this->db->query(
-            "SELECT DISTINCT TRIM(CD_GRUPO) AS CD_GRUPO FROM {$this->tabela} ORDER BY 1"
+        return $this->db->query(
+            "SELECT m.CD_GRUPO, MAX(TRIM(g.DESC_GRUPO)) AS DESCRICAO
+               FROM (SELECT DISTINCT TRIM(CD_GRUPO) AS CD_GRUPO FROM {$this->tabela}) m
+               LEFT JOIN {$this->tabelaGrupos} g ON g.CD_GRUPO = m.CD_GRUPO
+              GROUP BY m.CD_GRUPO
+              ORDER BY m.CD_GRUPO"
         );
-
-        return array_column($linhas, 'CD_GRUPO');
     }
 
-    /** @return list<string> */
+    /**
+     * Só os subgrupos do grupo que têm material, com o nome quando cadastrado.
+     *
+     * @return list<array{CD_SUB_GRUPO: string, DESCRICAO: string|null}>
+     */
     public function listarSubGrupos(string $grupo): array
     {
-        $linhas = $this->db->query(
-            "SELECT DISTINCT TRIM(CD_SUB_GRUPO) AS CD_SUB_GRUPO
-               FROM {$this->tabela}
-              WHERE CD_GRUPO = :grupo
-              ORDER BY 1",
+        return $this->db->query(
+            "SELECT m.CD_SUB_GRUPO, TRIM(g.DESC_SUBGRUPO) AS DESCRICAO
+               FROM (SELECT DISTINCT TRIM(CD_SUB_GRUPO) AS CD_SUB_GRUPO
+                       FROM {$this->tabela}
+                      WHERE CD_GRUPO = :grupo) m
+               LEFT JOIN {$this->tabelaGrupos} g
+                 ON g.CD_GRUPO = :grupo AND g.CD_SUB_GRUPO = m.CD_SUB_GRUPO
+              ORDER BY m.CD_SUB_GRUPO",
             ['grupo' => $grupo]
         );
-
-        return array_column($linhas, 'CD_SUB_GRUPO');
     }
 
     /**
@@ -144,8 +176,9 @@ final class MaterialRepository
 
         $descricao = trim((string) ($filtros['descricao'] ?? ''));
         if ($descricao !== '') {
-            $condicoes[] = "UPPER(m.DESCRICAO) LIKE :descricao ESCAPE '\\'";
-            $binds['descricao'] = '%' . self::escaparLike(mb_strtoupper($descricao)) . '%';
+            // Sem diferenciar acento nem maiúscula: "balanca" acha "BALANÇA".
+            $condicoes[] = self::semAcento('m.DESCRICAO') . ' LIKE ' . self::semAcento(':descricao') . " ESCAPE '\\'";
+            $binds['descricao'] = '%' . self::escaparLike($descricao) . '%';
         }
 
         $grupo = trim((string) ($filtros['grupo'] ?? ''));
@@ -163,6 +196,15 @@ final class MaterialRepository
         $where = $condicoes === [] ? '' : 'WHERE ' . implode(' AND ', $condicoes);
 
         return [$where, $binds];
+    }
+
+    /**
+     * Maiúsculas e sem acento, em SQL. TRANSLATE com a lista explícita (e não
+     * CONVERT para US7ASCII, que troca "Ã" por "?") funciona igual no 19c.
+     */
+    private static function semAcento(string $expr): string
+    {
+        return "TRANSLATE(UPPER({$expr}), 'ÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ', 'AAAAAEEEEIIIIOOOOOUUUUCN')";
     }
 
     /** Faz '%' e '_' digitados pelo usuário valerem como texto, não como curinga. */

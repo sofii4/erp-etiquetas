@@ -4,7 +4,7 @@
  * Os dados vêm de /api/materiais via public/assets/js/materiais.js.
  *
  * @var string        $appName
- * @var list<string>  $grupos   preenchidos no servidor para o select já abrir pronto
+ * @var list<array{CD_GRUPO:string,DESCRICAO:?string}> $grupos   preenchidos no servidor para o select já abrir pronto
  */
 ?>
 <!DOCTYPE html>
@@ -51,25 +51,25 @@
     <!-- Filtros -->
     <form id="filtros" class="rounded-2xl border border-gray-800 bg-gray-900 p-4 md:p-5" autocomplete="off">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
-            <label class="lg:col-span-3 flex flex-col gap-1.5">
+            <label class="lg:col-span-2 flex flex-col gap-1.5">
                 <span class="text-xs uppercase tracking-widest text-gray-500 font-bold">Código</span>
                 <input name="codigo" maxlength="20" inputmode="numeric" placeholder="Começa com… ex.: 0104"
                        class="campo font-mono">
             </label>
-            <label class="lg:col-span-5 flex flex-col gap-1.5">
+            <label class="lg:col-span-4 flex flex-col gap-1.5">
                 <span class="text-xs uppercase tracking-widest text-gray-500 font-bold">Descrição</span>
                 <input name="descricao" maxlength="60" placeholder="Contém… ex.: parafuso" class="campo">
             </label>
-            <label class="lg:col-span-2 flex flex-col gap-1.5">
+            <label class="lg:col-span-3 flex flex-col gap-1.5">
                 <span class="text-xs uppercase tracking-widest text-gray-500 font-bold">Grupo</span>
                 <select name="grupo" class="campo">
                     <option value="">Todos</option>
                     <?php foreach ($grupos as $g): ?>
-                        <option value="<?= e($g) ?>"><?= e($g) ?></option>
+                        <option value="<?= e($g['CD_GRUPO']) ?>"><?= e(!empty($g['DESCRICAO']) ? "{$g['CD_GRUPO']} · {$g['DESCRICAO']}" : $g['CD_GRUPO']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
-            <label class="lg:col-span-2 flex flex-col gap-1.5">
+            <label class="lg:col-span-3 flex flex-col gap-1.5">
                 <span class="text-xs uppercase tracking-widest text-gray-500 font-bold">Subgrupo</span>
                 <select name="subgrupo" class="campo" disabled>
                     <option value="">Todos</option>

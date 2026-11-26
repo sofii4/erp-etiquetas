@@ -4,7 +4,7 @@ Módulo que complementa o ERP: consulta os materiais da tabela `ESMATERI` (Oracl
 
 **O que já funciona (Fase 1)**
 
-- Tela de consulta de materiais, com filtros por código, descrição e grupo/subgrupo, e com paginação.
+- Tela de consulta de materiais, com filtros por código, descrição (sem diferenciar acento: "balanca" acha "BALANÇA") e grupo/subgrupo, e com paginação. Grupos e subgrupos aparecem com o nome ("30 · EQUIPAMENTOS PADRAO"), vindo da tabela `GRUPO_SUBGRUPO`; o filtro só mostra os que têm material.
 - **Até duas imagens por material**, guardadas no banco: a **principal** aparece em miniatura na tabela (com o selo "2" quando há a segunda) e as duas são ampliadas ao clicar. No modal, um seletor alterna entre "Principal" e "Foto 2"; para cada uma dá para **tirar a foto com a câmera** ou **enviar um arquivo** (com prévia antes de salvar), remover, e **tornar a segunda a principal**. Material sem imagem mostra "+ Foto". Por enquanto não há controle de permissão: qualquer usuário pode alterar. Também dá para manter as imagens direto no banco (veja [Manutenção das imagens](#manutenção-das-imagens)).
 - Etiqueta em PDF (padrão 100 × 50 mm, configurável) com os dados do material e o QR Code.
 - Botão **Escanear QR Code**: lê o QR da etiqueta pela câmera (celular ou notebook) ou pelo campo de código e mostra o material, com atalhos para imprimir a etiqueta e filtrar a lista. A entrada e a saída de estoque (Fase 2) ainda não estão disponíveis.
@@ -17,7 +17,7 @@ Módulo que complementa o ERP: consulta os materiais da tabela `ESMATERI` (Oracl
 - O campo de código também atende **coletores com leitor embutido**, que "digitam" o código lido e mandam Enter.
 - A câmera é desligada sempre que a janela fecha.
 
-A `ESMATERI` do ERP é acessada **só para leitura**: o usuário da aplicação tem apenas `SELECT` nela. As imagens ficam numa tabela própria do módulo (`MATERIAL_IMAGEM`), no schema do usuário da aplicação.
+A `ESMATERI` e a `GRUPO_SUBGRUPO` (nomes dos grupos e subgrupos, export do ERP) são acessadas **só para leitura**: o usuário da aplicação tem apenas `SELECT` nelas. As imagens ficam numa tabela própria do módulo (`MATERIAL_IMAGEM`), no schema do usuário da aplicação.
 
 ### Como as imagens são guardadas
 
@@ -85,6 +85,7 @@ projeto-erp/
 │       ├── init/01-setup.sh         # 1º boot: cria usuários, tabela e dados
 │       └── sql/
 │           ├── 02-ddl-esmateri.sql  # estrutura da tabela ESMATERI
+│           ├── 02-ddl-grupo-subgrupo.sql # nomes dos grupos/subgrupos
 │           ├── 03-mocks.sql         # 22 materiais fictícios para teste
 │           ├── 04-material-imagem.sql # tabela das imagens (do módulo)
 │           └── migracoes/           # ajustes para bancos já existentes
@@ -137,8 +138,8 @@ O Compose sobe três containers na mesma rede:
 | POST | `/api/materiais/{cd}/imagem[/{pos}]` | Inclui ou troca a imagem (multipart, campo `imagem`, até 10 MB). Responde com o material |
 | DELETE | `/api/materiais/{cd}/imagem[/{pos}]` | Remove a imagem (remover a 1 promove a 2). Responde com o material |
 | POST | `/api/materiais/{cd}/imagem/inverter` | Troca a 1 com a 2 (`409` se não houver as duas) |
-| GET | `/api/grupos` | Lista de grupos |
-| GET | `/api/grupos/{grupo}/subgrupos` | Subgrupos de um grupo |
+| GET | `/api/grupos` | Grupos que têm material: `CD_GRUPO` e `DESCRICAO` |
+| GET | `/api/grupos/{grupo}/subgrupos` | Subgrupos do grupo que têm material: `CD_SUB_GRUPO` e `DESCRICAO` |
 | GET | `/etiquetas/{cd}` | Etiqueta em PDF (`?formato=html` para pré-visualizar) |
 | POST | `/api/leituras` | Fase 2: por enquanto responde `501` |
 | GET | `/health` | Verifica se a aplicação e o banco estão de pé |
@@ -177,11 +178,13 @@ As outras variáveis já vêm prontas para o ambiente local. Para mudar o tamanh
 
 ### 3. (Opcional) Carregar os materiais reais do cliente
 
-Sem este passo, o banco é carregado com 22 materiais fictícios. Para usar o export real da `ESMATERI` (CSV):
+Sem este passo, o banco é carregado com 22 materiais fictícios. Para usar o export real (CSV da `ESMATERI` e, opcional, o CSV de grupos/subgrupos com `CD_GRUPO, DESC_GRUPO, CD_SUB_GRUPO, DESC_SUBGRUPO`):
 
 ```bash
-python3 scripts/csv-para-sql.py var/arquivo.csv
+python3 scripts/csv-para-sql.py var/materiais.csv var/grupos.csv
 ```
+
+Os CSVs podem vir em Latin-1 (padrão do export) ou UTF-8. Linhas com colunas a mais ou a menos que o cabeçalho entram só com os campos básicos (grupo, subgrupo, código, descrição, unidade), e descrições acima de 60 bytes são cortadas; o script avisa cada caso. Sem o CSV de grupos, a tela mostra só os códigos.
 
 O script gera `docker/oracle/sql/03-dados-cliente.sql`. Quando esse arquivo existe, ele é usado no lugar dos dados fictícios. Ele **fica fora do git** porque contém dados reais do cliente.
 
@@ -302,6 +305,6 @@ Por esse caminho a imagem vai **sem otimização**. Prefira arquivos já pequeno
   @/opt/erp-sql/migracoes/2026-11-24-duas-imagens.sql
   EOF'
   ```
-- **Produção (AWS):** o usuário da aplicação precisa de cota num tablespace e da tabela `MATERIAL_IMAGEM` criada no schema dele (`04-material-imagem.sql`; se ela já tiver sido criada antes das duas imagens, rode também a migração acima). A `ESMATERI` continua só com `SELECT`. A aplicação web não grava nada: quem altera imagens é o script de manutenção ou o SQL.
+- **Produção (AWS):** o usuário da aplicação precisa de `SELECT` na `ESMATERI` e na tabela de grupos/subgrupos. Se no ERP ela tiver outro nome ou outras colunas, basta ajustar o `joinGrupo()`, o `listarGrupos()` e o `listarSubGrupos()` do `MaterialRepository`. Ele também precisa de cota num tablespace e da tabela `MATERIAL_IMAGEM` criada no schema dele (`04-material-imagem.sql`; se ela já tiver sido criada antes das duas imagens, rode também a migração acima). A `ESMATERI` continua só com `SELECT`. A aplicação web não grava nada: quem altera imagens é o script de manutenção ou o SQL.
 - **HTTPS em produção:** o certificado autoassinado é só para desenvolvimento. Na AWS o HTTPS deve vir de um certificado válido (no balanceador ou no nginx).
 - **Configuração:** dentro do Docker, o PHP recebe as configurações pelo ambiente, definidas no `docker-compose.yml`, e não lendo o `.env`. A senha do SYSTEM (`ORACLE_PASSWORD`) não é repassada à aplicação.

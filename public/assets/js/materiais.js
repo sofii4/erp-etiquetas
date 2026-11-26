@@ -90,7 +90,8 @@
             });
             if (!resp.ok) throw new Error();
             for (const sub of await resp.json()) {
-                selSub.add(new Option(sub, sub, false, sub === selecionado));
+                const cd = sub.CD_SUB_GRUPO;
+                selSub.add(new Option(sub.DESCRICAO ? `${cd} · ${sub.DESCRICAO}` : cd, cd, false, cd === selecionado));
             }
         } catch {
             selSub.disabled = true;
@@ -167,7 +168,15 @@
             `Local ${m.LOCALIZACAO ?? '—'} · ${m.CD_UNIDADE_MEDI ?? '—'}`);
         tdMat.append(desc, cod, extra);
 
-        const tdGrupo = el('td', 'hidden md:table-cell px-4 py-2.5 font-mono text-gray-400 whitespace-nowrap', `${m.CD_GRUPO ?? '—'} / ${m.CD_SUB_GRUPO ?? '—'}`);
+        // Grupo: código em cima, nome do subgrupo (ou do grupo) embaixo.
+        const tdGrupo = el('td', 'hidden md:table-cell px-4 py-2.5 align-middle');
+        tdGrupo.append(el('div', 'font-mono text-gray-400 whitespace-nowrap', `${m.CD_GRUPO ?? '—'} / ${m.CD_SUB_GRUPO ?? '—'}`));
+        const nomeGrupo = m.DESC_SUBGRUPO ?? m.DESC_GRUPO;
+        if (nomeGrupo) {
+            const nome = el('div', 'mt-0.5 text-xs text-gray-500 max-w-[12rem] truncate', nomeGrupo);
+            nome.title = [m.DESC_GRUPO, m.DESC_SUBGRUPO].filter(Boolean).join(' / ');
+            tdGrupo.append(nome);
+        }
         const tdUn = el('td', 'hidden md:table-cell px-4 py-2.5 text-gray-400', m.CD_UNIDADE_MEDI ?? '—');
         const tdLocal = el('td', 'hidden lg:table-cell px-4 py-2.5 font-mono text-gray-300 whitespace-nowrap', m.LOCALIZACAO ?? '—');
         const tdData = el('td', 'hidden lg:table-cell px-4 py-2.5 text-gray-500 whitespace-nowrap', formatarData(m.DT_CADASTRO));

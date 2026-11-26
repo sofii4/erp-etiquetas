@@ -3,7 +3,7 @@
 # Executado pela imagem gvenzl/oracle-xe só no PRIMEIRO boot (volume vazio).
 # Para rodar de novo: scripts/reset.sh
 #
-#   - "db_tst"      : dono da ESMATERI, como no ERP. Schema-only (sem senha,
+#   - "db_tst"      : dono da ESMATERI e da GRUPO_SUBGRUPO, como no ERP. Schema-only (sem senha,
 #                     ninguém faz login com ele).
 #   - ${DB_USER}    : usuário da aplicação. Só tem SELECT na ESMATERI
 #                     (espelha o usuário read-only pedido para a AWS) e é
@@ -58,7 +58,8 @@ for f in "$SQL_DIR"/02-*.sql "$DADOS"; do
 done
 
 echo "ERP: liberando leitura para ${APP_USER}..."
-roda_sql "GRANT SELECT ON \"${SCHEMA}\".ESMATERI TO ${APP_USER};"
+roda_sql "GRANT SELECT ON \"${SCHEMA}\".ESMATERI TO ${APP_USER};
+GRANT SELECT ON \"${SCHEMA}\".GRUPO_SUBGRUPO TO ${APP_USER};"
 
 # Tabela própria do módulo (imagens), no schema da aplicação.
 for f in "$SQL_DIR"/04-*.sql; do
